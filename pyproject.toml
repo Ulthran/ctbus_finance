@@ -1,0 +1,32 @@
+[project]
+name = "ctbus_finance"
+description = "A Python library for defining and interacting with a personal finance database."
+dynamic = ["version"]
+dependencies = [
+    "morningstar-data==1.10.6",
+    "pandas==2.2.3",
+    "SQLAlchemy==2.0.39",
+    "yfinance==0.2.55",
+]
+requires-python = ">=3.8"
+
+[project.optional-dependencies]
+dev = [
+    "black",
+    "pytest",
+    "pytest-cov",
+]
+
+[build-system]
+requires = ["setuptools"]
+build-backend = "setuptools.build_meta"
+
+[tool.setuptools.dynamic]
+version = {attr = "ctbus_finance.__version__"}
+
+[tool.setuptools.packages.find]
+include = ["ctbus_finance*"]
+exclude = ["alembic*"]
+
+[project.scripts]
+ctbus_finance = "ctbus_finance.cli:main"
