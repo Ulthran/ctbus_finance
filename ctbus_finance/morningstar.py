@@ -1,5 +1,6 @@
 import morningstar_data as md
 
+
 def get_allocation_morningstar(ticker):
     try:
         fund = MorningstarFund(ticker)
@@ -16,13 +17,14 @@ def get_allocation_morningstar(ticker):
             "international": allocation.get("foreign_stock", 0),
             "cash": allocation.get("cash", 0),
             "bonds": allocation.get("bond", 0),
-            "other": allocation.get("other", 0)
+            "other": allocation.get("other", 0),
         }
 
         return result
     except Exception as e:
         print(f"Error retrieving data for {ticker}: {e}")
         return None
+
 
 # Example usage
 if __name__ == "__main__":

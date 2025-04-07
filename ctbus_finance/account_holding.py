@@ -7,7 +7,14 @@ from sqlalchemy.orm import Session
 from datetime import datetime
 
 
-def create_account_holding(account_id: int, holding_id: int, date: datetime = datetime.today(), quantity: float = 0.0, purchase_date: datetime = datetime.today(), session: Session = None):
+def create_account_holding(
+    account_id: int,
+    holding_id: int,
+    date: datetime = datetime.today(),
+    quantity: float = 0.0,
+    purchase_date: datetime = datetime.today(),
+    session: Session = None,
+):
     """
     Create a new account holding in the database.
 
@@ -26,7 +33,9 @@ def create_account_holding(account_id: int, holding_id: int, date: datetime = da
     price = get_price(yf_data, date)
     purchase_price = get_price(yf_data, purchase_date)
     if not price or not purchase_price:
-        raise ValueError(f"Price data not available for ticker {session.get(Holding, holding_id).symbol} on date {date} or purchase date {purchase_date}")
+        raise ValueError(
+            f"Price data not available for ticker {session.get(Holding, holding_id).symbol} on date {date} or purchase date {purchase_date}"
+        )
 
     session.add(
         AccountHolding(

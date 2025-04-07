@@ -86,13 +86,23 @@ def process_account_holdings(df: pd.DataFrame, session: Session) -> pd.DataFrame
             ticker = get_ticker_data(row["holding_id"])
             df.loc[index, "price"] = get_price(ticker, df.loc[index, "date"])
             if pd.notna(row["purchase_date"]):
-                df.loc[index, "purchase_date"] = datetime.strptime(row["purchase_date"], "%Y-%m-%d").date()
+                df.loc[index, "purchase_date"] = datetime.strptime(
+                    row["purchase_date"], "%Y-%m-%d"
+                ).date()
                 # First try to access from previous entries in the db
-                if res := session.scalars(select(AccountHolding.purchase_price).filter_by(holding_id=row["holding_id"], purchase_date=row["purchase_date"])).first():
+                if res := session.scalars(
+                    select(AccountHolding.purchase_price)
+                    .filter_by(
+                        holding_id=row["holding_id"], purchase_date=row["purchase_date"]
+                    )
+                    .filter(AccountHolding.purchase_price.is_not(None))
+                ).first():
                     df.loc[index, "purchase_price"] = float(res)
                 # Then look it up
                 else:
-                    df.loc[index, "purchase_price"] = get_price(ticker, datetime.strptime(row["purchase_date"], "%Y-%m-%d"))
+                    df.loc[index, "purchase_price"] = get_price(
+                        ticker, datetime.strptime(row["purchase_date"], "%Y-%m-%d")
+                    )
 
         df.loc[index, "date"] = df.loc[index, "date"].date()
 
@@ -100,13 +110,29 @@ def process_account_holdings(df: pd.DataFrame, session: Session) -> pd.DataFrame
     df.insert(0, "date", dates)
     print("Purchase date type:", df["purchase_date"].dtype)
 
-    df["percentage_cash"] = df["percentage_cash"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    df["percentage_bond"] = df["percentage_bond"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    df["percentage_large_cap"] = df["percentage_large_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    df["percentage_mid_cap"] = df["percentage_mid_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    df["percentage_small_cap"] = df["percentage_small_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    df["percentage_international"] = df["percentage_international"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    df["percentage_other"] = df["percentage_other"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
+    df["percentage_cash"] = (
+        df["percentage_cash"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
+    )
+    df["percentage_bond"] = (
+        df["percentage_bond"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
+    )
+    df["percentage_large_cap"] = (
+        df["percentage_large_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
+    )
+    df["percentage_mid_cap"] = (
+        df["percentage_mid_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
+    )
+    df["percentage_small_cap"] = (
+        df["percentage_small_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
+    )
+    df["percentage_international"] = (
+        df["percentage_international"]
+        .fillna(0)
+        .apply(lambda x: float(x) if x != "" else 0)
+    )
+    df["percentage_other"] = (
+        df["percentage_other"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
+    )
 
     return df
 

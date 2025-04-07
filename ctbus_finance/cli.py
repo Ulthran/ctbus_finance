@@ -35,9 +35,16 @@ def main():
     if args.command == "create_db":
         create_database()
     elif args.command == "ingest_csv":
-        ingest_csv_parser = argparse.ArgumentParser(prog="ingest_csv", description="Ingest a CSV file into the database.")
-        ingest_csv_parser.add_argument("file_path", help="Path to the CSV file to ingest.")
-        ingest_csv_parser.add_argument("type", help="Type of the CSV file (e.g., accounts, holdings, account_holdings).")
+        ingest_csv_parser = argparse.ArgumentParser(
+            prog="ingest_csv", description="Ingest a CSV file into the database."
+        )
+        ingest_csv_parser.add_argument(
+            "file_path", help="Path to the CSV file to ingest."
+        )
+        ingest_csv_parser.add_argument(
+            "type",
+            help="Type of the CSV file (e.g., accounts, holdings, account_holdings).",
+        )
         ingest_csv_args = ingest_csv_parser.parse_args(remaining)
 
         if not ingest_csv_args.file_path:
@@ -49,7 +56,13 @@ def main():
         if not Path(ingest_csv_args.file_path).exists():
             sys.stderr.write(f"File {ingest_csv_args.file_path} does not exist.\n")
             sys.exit(1)
-        if ingest_csv_args.type not in ["accounts", "holdings", "account_holdings", "credit_cards", "credit_card_holdings"]:
+        if ingest_csv_args.type not in [
+            "accounts",
+            "holdings",
+            "account_holdings",
+            "credit_cards",
+            "credit_card_holdings",
+        ]:
             sys.stderr.write(f"Type {ingest_csv_args.type} is not recognized.\n")
             sys.exit(1)
 

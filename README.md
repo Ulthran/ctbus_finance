@@ -4,14 +4,23 @@ A simple finance tracker using Python, SQLite, and Yahoo Finance
 
 ## Usage
 
-Go through and add your accounts:
+Make CSVs for your accounts (name,type,institution), holdings (symbol,name,asset_type), and credit_cards (name,institution,card_type). See examples in `example_data/`. Then run:
 
 ```
-ctbus_finance create_account "Account 1" Cash
-ctbus_finance create_account "Account 2" "Roth IRA"
+ctbus_finance create_db
+ctbus_finance ingest_csv accounts.csv accounts
+ctbus_finance ingest_csv holdings.csv holdings
+ctbus_finance ingest_csv credit_cards.csv credit_cards
 ```
 
+You can add more later by adding to the CSVs and then rerunning the above (it won't add duplicates). Then each month, make CSVs for account_holdings (account_id,holding_id,quantity,price,purchase_date,purchase_price,percentage_cash,percentage_bond,percentage_large_cap,percentage_mid_cap,percentage_small_cap,percentage_international,percentage_other,notes) and credit_card_holdings (credit_card_id,balance,rewards). Then run:
 
+```
+ctbus_finance ingest_csv account_holdings_YYYY_MM_DD.csv account_holdings
+ctbus_finance ingest_csv credit_card_holdings_YYYY_MM_DD.csv credit_card_holdings
+```
+
+Note that it will fill in today's date for `date` unless it is specified in the CSV. It will also try to fill purchase_price for each asset from previous entries (especially useful if you have things Yahoo finance can't identify, so it won't keep looking that up and failing).
 
 ## Dev
 

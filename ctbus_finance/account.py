@@ -3,7 +3,9 @@ from ctbus_finance.models import Account
 from sqlalchemy.orm import Session
 
 
-def create_account(name: str, account_type: str, institution: str, session: Session = None):
+def create_account(
+    name: str, account_type: str, institution: str, session: Session = None
+):
     """
     Create a new account in the database.
 
