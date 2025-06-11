@@ -1,5 +1,8 @@
-import yfinance as yf
+import time
 from datetime import datetime, timedelta
+
+import yfinance as yf
+from yfinance.exceptions import YFRateLimitError
 
 
 def get_ticker_data(ticker: str) -> yf.Ticker:
@@ -18,7 +21,12 @@ def get_ticker_data(ticker: str) -> yf.Ticker:
         raise ValueError(f"Error fetching data for ticker {ticker}: {e}")
 
 
-def get_price(ticker: yf.Ticker, date: datetime) -> float:
+def get_price(
+    ticker: yf.Ticker,
+    date: datetime,
+    max_retries: int = 3,
+    retry_delay: float = 1.0,
+) -> float:
     """
     Fetches the of the given ticker at close for the given date.
 
@@ -29,7 +37,23 @@ def get_price(ticker: yf.Ticker, date: datetime) -> float:
     Returns:
     float: The price of the ticker.
     """
-    df = ticker.history(start=date - timedelta(days=1), end=date + timedelta(days=2))
+    attempts = 0
+    while True:
+        try:
+            df = ticker.history(
+                start=date - timedelta(days=1), end=date + timedelta(days=2)
+            )
+            break
+        except YFRateLimitError:
+            attempts += 1
+            if attempts >= max_retries:
+                raise
+            time.sleep(retry_delay)
+        except Exception:
+            attempts += 1
+            if attempts >= max_retries:
+                raise
+            time.sleep(retry_delay)
 
     if date in df.index:
         return round(df.loc[date]["Close"], 2)
@@ -38,3 +62,4 @@ def get_price(ticker: yf.Ticker, date: datetime) -> float:
         for index in df.index:
             if index.date() <= date.date():
                 return round(df.loc[index]["Close"], 2)
+
