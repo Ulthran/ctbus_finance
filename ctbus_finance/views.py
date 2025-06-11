@@ -7,7 +7,7 @@ from ctbus_finance.models import (
     Holding,
 )
 from datetime import datetime
-from sqlalchemy import extract
+from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
 
@@ -108,7 +108,43 @@ def get_net_value() -> float:
     )
 
 
+def get_monthly_net_worth() -> list[tuple[str, float]]:
+    """Return net worth totals grouped by month."""
+    session = get_session()
+    account_sums = (
+        session.query(
+            extract("year", AccountHolding.date).label("year"),
+            extract("month", AccountHolding.date).label("month"),
+            func.sum(AccountHolding.quantity * AccountHolding.price).label("total"),
+        )
+        .group_by("year", "month")
+        .all()
+    )
+    credit_sums = (
+        session.query(
+            extract("year", CreditCardHolding.date).label("year"),
+            extract("month", CreditCardHolding.date).label("month"),
+            func.sum(CreditCardHolding.balance).label("total"),
+        )
+        .group_by("year", "month")
+        .all()
+    )
+    acc = {(int(y), int(m)): float(t or 0) for y, m, t in account_sums}
+    cc = {(int(y), int(m)): float(t or 0) for y, m, t in credit_sums}
+    all_months = sorted(set(acc.keys()) | set(cc.keys()))
+
+    result: list[tuple[str, float]] = []
+    for y, m in all_months:
+        dt = datetime(int(y), int(m), 1)
+        label = dt.strftime("%Y-%m")
+        net = round(acc.get((y, m), 0.0) - cc.get((y, m), 0.0), 2)
+        result.append((label, net))
+    session.close()
+    return result
+
+
 if __name__ == "__main__":
     print(get_accounts())
     print(get_credit_cards())
     print(get_net_value())
+    print(get_monthly_net_worth())

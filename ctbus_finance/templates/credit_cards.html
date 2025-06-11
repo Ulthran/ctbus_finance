@@ -1,0 +1,21 @@
+<!doctype html>
+<html>
+<head>
+    <title>Credit Cards</title>
+</head>
+<body>
+    <h1>Credit Cards</h1>
+    <table>
+        <tr><th>Name</th><th>Type</th><th>Institution</th><th>Balance</th></tr>
+        {% for name, card_type, inst, balance in credit_cards %}
+        <tr>
+            <td>{{ name }}</td>
+            <td>{{ card_type }}</td>
+            <td>{{ inst }}</td>
+            <td>{{ balance }}</td>
+        </tr>
+        {% endfor %}
+    </table>
+    <p><a href="{{ url_for('index') }}">Home</a></p>
+</body>
+</html>
