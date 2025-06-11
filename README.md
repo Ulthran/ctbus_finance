@@ -22,6 +22,17 @@ ctbus_finance ingest_csv credit_card_holdings_YYYY_MM_DD.csv credit_card_holding
 
 Note that it will fill in today's date for `date` unless it is specified in the CSV. It will also try to fill purchase_price for each asset from previous entries (especially useful if you have things Yahoo finance can't identify, so it won't keep looking that up and failing).
 
+### Web interface
+
+Run the Flask application on `0.0.0.0` so the development server is reachable
+outside the container:
+
+```
+flask --app ctbus_finance/flask_app run --host 0.0.0.0
+```
+
+Then open port `5000` in your browser.
+
 ## Dev
 
 ### Database migration
