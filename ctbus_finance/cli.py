@@ -1,5 +1,6 @@
 import argparse
 import sys
+from datetime import datetime
 from ctbus_finance import __version__
 from ctbus_finance.db import create_database, ingest_csv
 from pathlib import Path
@@ -45,6 +46,11 @@ def main():
             "type",
             help="Type of the CSV file (e.g., accounts, holdings, account_holdings).",
         )
+        ingest_csv_parser.add_argument(
+            "--date",
+            help="Default date (YYYY-MM-DD) to use if date column is missing.",
+            default=datetime.today().strftime("%Y-%m-%d"),
+        )
         ingest_csv_args = ingest_csv_parser.parse_args(remaining)
 
         if not ingest_csv_args.file_path:
@@ -66,7 +72,14 @@ def main():
             sys.stderr.write(f"Type {ingest_csv_args.type} is not recognized.\n")
             sys.exit(1)
 
-        ingest_csv(fp=Path(ingest_csv_args.file_path), table=ingest_csv_args.type)
+        default_date = datetime.strptime(
+            ingest_csv_args.date, "%Y-%m-%d"
+        ).date()
+        ingest_csv(
+            fp=Path(ingest_csv_args.file_path),
+            table=ingest_csv_args.type,
+            default_date=default_date,
+        )
     else:
         parser.print_help()
         sys.stderr.write("Unrecognized command.\n")

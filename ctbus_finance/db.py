@@ -1,6 +1,6 @@
 import os
 import pandas as pd
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 from sqlalchemy import create_engine, select
 from sqlalchemy.engine import Connection
@@ -61,27 +61,32 @@ def get_session(database_url: str = get_db_url()) -> Session:
     return session
 
 
-def ingest_csv(fp: Path, table: str):
+def ingest_csv(fp: Path, table: str, default_date: date | None = None):
+    if default_date is None:
+        default_date = datetime.today().date()
+
     session = get_session()
     df = pd.read_csv(fp)
 
     if table == "account_holdings":
-        df = process_account_holdings(df, session)
+        df = process_account_holdings(df, session, default_date)
     if table == "credit_card_holdings":
-        df = process_credit_card_holdings(df, session)
+        df = process_credit_card_holdings(df, session, default_date)
 
     df.to_sql(table, con=session.bind, if_exists="replace", index=False)
     session.commit()
     session.close()
 
 
-def process_account_holdings(df: pd.DataFrame, session: Session) -> pd.DataFrame:
+def process_account_holdings(
+    df: pd.DataFrame, session: Session, default_date: date
+) -> pd.DataFrame:
     print("Processing account holdings...")
     for index, row in df.iterrows():
         print(row["account_id"], row["holding_id"], row["purchase_date"])
         df.loc[index, "quantity"] = float(row["quantity"])
         if pd.isna(row["date"]):
-            df.loc[index, "date"] = datetime.today()
+            df.loc[index, "date"] = default_date
         if pd.isna(row["price"]):
             ticker = get_ticker_data(row["holding_id"])
             df.loc[index, "price"] = get_price(ticker, df.loc[index, "date"])
@@ -137,11 +142,13 @@ def process_account_holdings(df: pd.DataFrame, session: Session) -> pd.DataFrame
     return df
 
 
-def process_credit_card_holdings(df: pd.DataFrame, session: Session) -> pd.DataFrame:
+def process_credit_card_holdings(
+    df: pd.DataFrame, session: Session, default_date: date
+) -> pd.DataFrame:
     print("Processing credit card holdings...")
     for index, row in df.iterrows():
         print(row["credit_card_id"], row["balance"], row["rewards"])
         df.loc[index, "balance"] = float(row["balance"])
-        df.loc[index, "date"] = datetime.today().date()
+        df.loc[index, "date"] = default_date
 
     return df
