@@ -87,9 +87,7 @@ def ingest_csv(fp: Path, table: str, default_date: date | None = None):
 def process_account_holdings(
     df: pd.DataFrame, session: Session, default_date: date
 ) -> pd.DataFrame:
-    print("Processing account holdings...")
     for index, row in df.iterrows():
-        print(row["account_id"], row["holding_id"], row["purchase_date"])
         df.loc[index, "quantity"] = float(row["quantity"])
         if pd.isna(row["date"]):
             df.loc[index, "date"] = default_date
@@ -119,7 +117,6 @@ def process_account_holdings(
 
     dates = df.pop("date")
     df.insert(0, "date", dates)
-    print("Purchase date type:", df["purchase_date"].dtype)
 
     df["percentage_cash"] = (
         df["percentage_cash"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
@@ -151,9 +148,7 @@ def process_account_holdings(
 def process_credit_card_holdings(
     df: pd.DataFrame, session: Session, default_date: date
 ) -> pd.DataFrame:
-    print("Processing credit card holdings...")
     for index, row in df.iterrows():
-        print(row["credit_card_id"], row["balance"], row["rewards"])
         df.loc[index, "balance"] = float(row["balance"])
         df.loc[index, "date"] = default_date
 

@@ -143,8 +143,3 @@ def get_monthly_net_worth() -> list[tuple[str, float]]:
     return result
 
 
-if __name__ == "__main__":
-    print(get_accounts())
-    print(get_credit_cards())
-    print(get_net_value())
-    print(get_monthly_net_worth())

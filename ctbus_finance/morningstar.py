@@ -1,4 +1,5 @@
 import morningstar_data as md
+from morningstar_data import MorningstarFund
 
 
 def get_allocation_morningstar(ticker):
@@ -24,10 +25,3 @@ def get_allocation_morningstar(ticker):
     except Exception as e:
         print(f"Error retrieving data for {ticker}: {e}")
         return None
-
-
-# Example usage
-if __name__ == "__main__":
-    # Replace 'VEXAX' with the desired ticker symbol
-    data = get_allocation_morningstar("VEXAX")
-    print(data)
