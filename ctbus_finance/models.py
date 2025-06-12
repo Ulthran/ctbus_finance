@@ -1,12 +1,10 @@
 from sqlalchemy import (
     Column,
-    Integer,
     String,
     Float,
     ForeignKey,
     UniqueConstraint,
     Date,
-    DateTime,
 )
 from sqlalchemy.orm import relationship, declarative_base
 

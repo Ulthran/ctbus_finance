@@ -2,7 +2,8 @@ import argparse
 import sys
 from datetime import datetime
 from ctbus_finance import __version__
-from ctbus_finance.db import create_database, ingest_csv
+from ctbus_finance.db import create_database
+from ctbus_finance.ingest import ingest_csv
 from pathlib import Path
 
 
