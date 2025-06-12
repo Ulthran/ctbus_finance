@@ -1,17 +1,33 @@
 import os
+import csv
 import pandas as pd
 from datetime import datetime, date
 from pathlib import Path
 from sqlalchemy import create_engine, select
-from typing import Dict, Set
+from typing import Dict, Set, List
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 from ctbus_finance.models import Base, AccountHolding, CreditCardHolding
 from ctbus_finance.yahoo_finance import (
     get_price,
-    get_ticker_data,
-    get_prices_batch,
+    download_prices_for_date,
+    download_price,
 )
+
+
+def _parse_date(val: str | None, default: date | None = None) -> date | None:
+    if val is None or val == "":
+        return default
+    return datetime.strptime(val, "%Y-%m-%d").date()
+
+
+def _parse_float(val: str | None) -> float | None:
+    if val is None or val == "":
+        return None
+    try:
+        return float(val)
+    except Exception:
+        return None
 
 
 def get_db_url() -> str:
@@ -70,19 +86,9 @@ def ingest_csv(fp: Path, table: str, default_date: date | None = None):
         default_date = datetime.today().date()
 
     session = get_session()
-    df = pd.read_csv(fp)
 
     if table == "account_holdings":
-        df = process_account_holdings(df, session, default_date)
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df["purchase_date"] = df["purchase_date"].apply(
-            lambda x: pd.to_datetime(x).date() if pd.notna(x) and x != "" else None
-        )
-        # drop duplicates within the CSV itself
-        df.drop_duplicates(
-            subset=["account_id", "holding_id", "date", "purchase_date"], inplace=True
-        )
-        # filter out rows that already exist in the database
+        holdings = load_account_holdings(fp, session, default_date)
         existing_keys = {
             (
                 r.account_id,
@@ -99,130 +105,132 @@ def ingest_csv(fp: Path, table: str, default_date: date | None = None):
                 )
             )
         }
-
-        df = df[
-            ~df.apply(
-                lambda row: (
-                    row["account_id"],
-                    row["holding_id"],
-                    row["date"],
-                    row["purchase_date"],
-                )
-                in existing_keys,
-                axis=1,
-            )
+        holdings = [
+            h
+            for h in holdings
+            if (h.account_id, h.holding_id, h.date, h.purchase_date)
+            not in existing_keys
         ]
+        if holdings:
+            session.add_all(holdings)
+            session.commit()
+        else:
+            print("No new rows to insert into account_holdings")
 
-    if table == "credit_card_holdings":
-        df = process_credit_card_holdings(df, session, default_date)
-        df["date"] = pd.to_datetime(df["date"]).dt.date
-        df.drop_duplicates(subset=["credit_card_id", "date"], inplace=True)
+    elif table == "credit_card_holdings":
+        holdings = load_credit_card_holdings(fp, default_date)
         existing_keys = {
             (r.credit_card_id, r.date)
             for r in session.execute(
                 select(CreditCardHolding.credit_card_id, CreditCardHolding.date)
             )
         }
-        df = df[
-            ~df.apply(
-                lambda row: (row["credit_card_id"], row["date"]) in existing_keys,
-                axis=1,
-            )
+        holdings = [
+            h for h in holdings if (h.credit_card_id, h.date) not in existing_keys
         ]
-
-    if not df.empty:
-        df.to_sql(table, con=session.bind, if_exists="append", index=False)
-        session.commit()
+        if holdings:
+            session.add_all(holdings)
+            session.commit()
+        else:
+            print("No new rows to insert into credit_card_holdings")
     else:
-        print(f"No new rows to insert into {table}")
+        df = pd.read_csv(fp)
+        if not df.empty:
+            df.to_sql(table, con=session.bind, if_exists="append", index=False)
+            session.commit()
+        else:
+            print(f"No new rows to insert into {table}")
+
     session.close()
 
 
-def process_account_holdings(
-    df: pd.DataFrame, session: Session, default_date: date
-) -> pd.DataFrame:
+def load_account_holdings(fp: Path, session: Session, default_date: date) -> List[AccountHolding]:
     print("Processing account holdings...")
-    if "date" not in df.columns:
-        df["date"] = default_date
-    # Determine which prices need to be looked up and batch those requests
-    lookup_dates: Dict[str, Set[datetime]] = {}
-    for _, row in df.iterrows():
-        symbol = row["holding_id"]
-        if pd.isna(row["price"]):
-            date_val = pd.to_datetime(
-                row["date"] if pd.notna(row["date"]) else default_date
+    with open(fp, newline="") as f:
+        reader = csv.DictReader(f)
+        rows = [row for row in reader]
+
+    for row in rows:
+        row["date"] = _parse_date(row.get("date"), default_date)
+        row["purchase_date"] = _parse_date(row.get("purchase_date"))
+        row["quantity"] = float(row.get("quantity") or 0)
+        row["price"] = _parse_float(row.get("price"))
+        row["purchase_price"] = _parse_float(row.get("purchase_price"))
+        for field in [
+            "percentage_cash",
+            "percentage_bond",
+            "percentage_large_cap",
+            "percentage_mid_cap",
+            "percentage_small_cap",
+            "percentage_international",
+            "percentage_other",
+        ]:
+            row[field] = float(row.get(field) or 0)
+
+    # fetch missing current prices in batches
+    lookups: Dict[date, Set[str]] = {}
+    for row in rows:
+        if row["price"] is None:
+            lookups.setdefault(row["date"], set()).add(row["holding_id"])
+
+    for d, symbols in lookups.items():
+        prices = download_prices_for_date(symbols, d)
+        for row in rows:
+            if row["price"] is None and row["date"] == d and row["holding_id"] in prices:
+                row["price"] = prices[row["holding_id"]]
+
+    # fetch purchase prices individually
+    for row in rows:
+        pd_val = row["purchase_date"]
+        if pd_val and row["purchase_price"] is None:
+            res = session.scalars(
+                select(AccountHolding.purchase_price)
+                .filter_by(holding_id=row["holding_id"], purchase_date=pd_val)
+                .filter(AccountHolding.purchase_price.is_not(None))
+            ).first()
+            if res is not None:
+                row["purchase_price"] = float(res)
+            else:
+                row["purchase_price"] = download_price(row["holding_id"], pd_val)
+
+    holdings: List[AccountHolding] = []
+    for row in rows:
+        holdings.append(
+            AccountHolding(
+                account_id=row["account_id"],
+                holding_id=row["holding_id"],
+                date=row["date"],
+                purchase_date=row["purchase_date"],
+                quantity=row["quantity"],
+                price=row["price"],
+                purchase_price=row["purchase_price"],
+                percentage_cash=row.get("percentage_cash"),
+                percentage_bond=row.get("percentage_bond"),
+                percentage_large_cap=row.get("percentage_large_cap"),
+                percentage_mid_cap=row.get("percentage_mid_cap"),
+                percentage_small_cap=row.get("percentage_small_cap"),
+                percentage_international=row.get("percentage_international"),
+                percentage_other=row.get("percentage_other"),
+                notes=row.get("notes"),
             )
-            lookup_dates.setdefault(symbol, set()).add(date_val)
-            if pd.notna(row["purchase_date"]):
-                lookup_dates[symbol].add(pd.to_datetime(row["purchase_date"]))
+        )
 
-    for symbol, dates in lookup_dates.items():
-        get_prices_batch(symbol, dates)
-
-    for index, row in df.iterrows():
-        print(row["account_id"], row["holding_id"], row["purchase_date"])
-        df.at[index, "quantity"] = float(row["quantity"])
-        if pd.isna(row["date"]):
-            df.at[index, "date"] = default_date
-        if pd.isna(row["price"]):
-            ticker = get_ticker_data(row["holding_id"])
-            df.at[index, "price"] = get_price(
-                ticker, pd.to_datetime(df.at[index, "date"])
-            )
-            if pd.notna(row["purchase_date"]):
-                df.at[index, "purchase_date"] = datetime.strptime(
-                    row["purchase_date"], "%Y-%m-%d"
-                ).date()
-                if res := session.scalars(
-                    select(AccountHolding.purchase_price)
-                    .filter_by(
-                        holding_id=row["holding_id"], purchase_date=row["purchase_date"]
-                    )
-                    .filter(AccountHolding.purchase_price.is_not(None))
-                ).first():
-                    df.at[index, "purchase_price"] = float(res)
-                else:
-                    df.at[index, "purchase_price"] = get_price(
-                        ticker, pd.to_datetime(row["purchase_date"])
-                    )
-    dates = df.pop("date")
-    df.insert(0, "date", dates)
-    print("Purchase date type:", df["purchase_date"].dtype)
-
-    df["percentage_cash"] = (
-        df["percentage_cash"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    )
-    df["percentage_bond"] = (
-        df["percentage_bond"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    )
-    df["percentage_large_cap"] = (
-        df["percentage_large_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    )
-    df["percentage_mid_cap"] = (
-        df["percentage_mid_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    )
-    df["percentage_small_cap"] = (
-        df["percentage_small_cap"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    )
-    df["percentage_international"] = (
-        df["percentage_international"]
-        .fillna(0)
-        .apply(lambda x: float(x) if x != "" else 0)
-    )
-    df["percentage_other"] = (
-        df["percentage_other"].fillna(0).apply(lambda x: float(x) if x != "" else 0)
-    )
-
-    return df
+    return holdings
 
 
-def process_credit_card_holdings(
-    df: pd.DataFrame, session: Session, default_date: date
-) -> pd.DataFrame:
+def load_credit_card_holdings(fp: Path, default_date: date) -> List[CreditCardHolding]:
     print("Processing credit card holdings...")
-    for index, row in df.iterrows():
-        print(row["credit_card_id"], row["balance"], row["rewards"])
-        df.at[index, "balance"] = float(row["balance"])
-        df.at[index, "date"] = default_date
+    with open(fp, newline="") as f:
+        reader = csv.DictReader(f)
+        holdings: List[CreditCardHolding] = []
+        for row in reader:
+            holdings.append(
+                CreditCardHolding(
+                    credit_card_id=row["credit_card_id"],
+                    date=_parse_date(row.get("date"), default_date),
+                    balance=float(row.get("balance") or 0),
+                    rewards=_parse_float(row.get("rewards")),
+                )
+            )
 
-    return df
+    return holdings
