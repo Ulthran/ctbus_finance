@@ -57,11 +57,27 @@ def get_prices_batch(ticker: str, dates: Iterable[datetime]) -> None:
     attempts = 0
     while True:
         try:
-            df = yf.download(ticker, start=start, end=end, progress=False)
+            # yfinance's multi-symbol download function spawns background
+            # threads which can easily trigger Yahoo's rate limits. Disable
+            # threading and request only the minimal daily data we need.
+            df = yf.download(
+                ticker,
+                start=start,
+                end=end,
+                progress=False,
+                actions=False,
+                auto_adjust=False,
+                threads=False,
+            )
             break
+        except YFRateLimitError:
+            attempts += 1
+            if attempts >= 5:
+                raise
+            time.sleep(2**attempts)
         except Exception:
             attempts += 1
-            if attempts >= 2:
+            if attempts >= 5:
                 raise
             time.sleep(1)
 
@@ -103,13 +119,23 @@ def get_price(
         attempts = 0
         while True:
             try:
+                # Request only one day's OHLC data and disable threads to avoid
+                # multiple concurrent connections which can trigger rate limits.
                 df = yf.download(
                     ticker.ticker if hasattr(ticker, "ticker") else str(ticker),
                     start=date,
                     end=date + timedelta(days=1),
                     progress=False,
+                    actions=False,
+                    auto_adjust=False,
+                    threads=False,
                 )
                 break
+            except YFRateLimitError:
+                attempts += 1
+                if attempts > max_retries:
+                    raise
+                time.sleep(2**attempts)
             except Exception:
                 attempts += 1
                 if attempts > max_retries:
@@ -141,17 +167,28 @@ def download_prices_for_date(
         attempts = 0
         while True:
             try:
+                # Fetch each ticker sequentially with the minimal daily data.
+                # yfinance would normally spawn multiple threads when given a
+                # list of tickers which increases the risk of HTTP 429 errors.
                 df = yf.download(
                     missing,
                     start=date,
                     end=date + timedelta(days=1),
                     progress=False,
                     group_by="ticker",
+                    actions=False,
+                    auto_adjust=False,
+                    threads=False,
                 )
                 break
+            except YFRateLimitError:
+                attempts += 1
+                if attempts >= 5:
+                    raise
+                time.sleep(2**attempts)
             except Exception:
                 attempts += 1
-                if attempts >= 2:
+                if attempts >= 5:
                     raise
                 time.sleep(retry_delay)
 
