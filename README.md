@@ -4,7 +4,7 @@ A simple finance tracker using Python, SQLite, and Yahoo Finance
 
 ## Usage
 
-Make CSVs for your accounts (name,type,institution), holdings (symbol,name,asset_type), and credit_cards (name,institution,card_type). See examples in `example_data/`. Then run:
+Make CSVs for your accounts (name,type,institution), holdings (symbol,name,asset_type), and credit_cards (name,institution,card_type). See examples in `example_data/`. Sample datasets are provided there for testing. Then run:
 
 ```
 ctbus_finance create_db
