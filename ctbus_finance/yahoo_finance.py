@@ -118,4 +118,8 @@ def get_price(
                 if index.date() <= date.date():
                     _PRICE_CACHE[key] = round(df.loc[index]["Close"], 2)
                     break
+            else:
+                raise ValueError(
+                    f"No valid price data found for ticker {ticker.ticker if hasattr(ticker, 'ticker') else str(ticker)} on or before {date.date()}."
+                )
     return _PRICE_CACHE[key]
