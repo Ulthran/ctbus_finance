@@ -5,7 +5,7 @@ from pathlib import Path
 from sqlalchemy import create_engine, select
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
-from ctbus_finance.models import Base, AccountHolding
+from ctbus_finance.models import Base, AccountHolding, CreditCardHolding
 from ctbus_finance.yahoo_finance import get_price, get_ticker_data
 
 
@@ -69,11 +69,67 @@ def ingest_csv(fp: Path, table: str, default_date: date | None = None):
 
     if table == "account_holdings":
         df = process_account_holdings(df, session, default_date)
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        df["purchase_date"] = df["purchase_date"].apply(
+            lambda x: pd.to_datetime(x).date() if pd.notna(x) and x != "" else None
+        )
+        # drop duplicates within the CSV itself
+        df.drop_duplicates(
+            subset=["account_id", "holding_id", "date", "purchase_date"], inplace=True
+        )
+        # filter out rows that already exist in the database
+        existing_keys = {
+            (
+                r.account_id,
+                r.holding_id,
+                r.date,
+                r.purchase_date,
+            )
+            for r in session.execute(
+                select(
+                    AccountHolding.account_id,
+                    AccountHolding.holding_id,
+                    AccountHolding.date,
+                    AccountHolding.purchase_date,
+                )
+            )
+        }
+
+        df = df[
+            ~df.apply(
+                lambda row: (
+                    row["account_id"],
+                    row["holding_id"],
+                    row["date"],
+                    row["purchase_date"],
+                )
+                in existing_keys,
+                axis=1,
+            )
+        ]
+
     if table == "credit_card_holdings":
         df = process_credit_card_holdings(df, session, default_date)
+        df["date"] = pd.to_datetime(df["date"]).dt.date
+        df.drop_duplicates(subset=["credit_card_id", "date"], inplace=True)
+        existing_keys = {
+            (r.credit_card_id, r.date)
+            for r in session.execute(
+                select(CreditCardHolding.credit_card_id, CreditCardHolding.date)
+            )
+        }
+        df = df[
+            ~df.apply(
+                lambda row: (row["credit_card_id"], row["date"]) in existing_keys,
+                axis=1,
+            )
+        ]
 
-    df.to_sql(table, con=session.bind, if_exists="replace", index=False)
-    session.commit()
+    if not df.empty:
+        df.to_sql(table, con=session.bind, if_exists="append", index=False)
+        session.commit()
+    else:
+        print(f"No new rows to insert into {table}")
     session.close()
 
 
