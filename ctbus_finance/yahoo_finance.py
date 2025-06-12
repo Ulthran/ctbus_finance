@@ -9,12 +9,15 @@ ingesting account holdings.
 
 from __future__ import annotations
 
+import logging
 import time
 from datetime import date, timedelta
 from typing import Dict, Iterable
 
 import yfinance as yf
 from yfinance.exceptions import YFRateLimitError
+
+logger = logging.getLogger(__name__)
 
 # Cache of {(ticker, date): price}.  Prices are stored rounded to two decimal
 # places to avoid small floating point differences from yfinance.
@@ -35,7 +38,10 @@ def download_prices_for_date(
     """
 
     unique = sorted({t.upper() for t in tickers})
+    logger.debug("Fetching prices for %s on %s", unique, on_date)
     missing = [t for t in unique if (t, on_date) not in _PRICE_CACHE]
+    if missing:
+        logger.debug("Missing from cache: %s", missing)
     if missing:
         if on_date.weekday() >= 5:
             # Markets are closed on weekends
@@ -54,14 +60,28 @@ def download_prices_for_date(
                     auto_adjust=False,
                     threads=False,
                 )
+                logger.debug("Fetched data for %s on %s", missing, on_date)
                 break
             except YFRateLimitError:
                 attempts += 1
+                logger.warning(
+                    "Rate limited fetching %s on %s (attempt %d)",
+                    missing,
+                    on_date,
+                    attempts,
+                )
                 if attempts >= max_retries:
                     raise
                 time.sleep(2**attempts)
-            except Exception:
+            except Exception as exc:
                 attempts += 1
+                logger.warning(
+                    "Error fetching %s on %s: %s (attempt %d)",
+                    missing,
+                    on_date,
+                    exc,
+                    attempts,
+                )
                 if attempts >= max_retries:
                     raise
                 time.sleep(1)
@@ -73,10 +93,13 @@ def download_prices_for_date(
                 continue
             price = round(float(data.loc[on_date]["Close"]), 2)
             _PRICE_CACHE[(t, on_date)] = price
+            logger.debug("Cached price for %s on %s: %s", t, on_date, price)
 
-    return {
+    result = {
         t: _PRICE_CACHE[(t, on_date)] for t in unique if (t, on_date) in _PRICE_CACHE
     }
+    logger.debug("Returning prices: %s", result)
+    return result
 
 
 def download_price(ticker: str, on_date: date) -> float:
@@ -92,3 +115,4 @@ def clear_cache() -> None:
     """Remove all cached price data."""
 
     _PRICE_CACHE.clear()
+    logger.debug("Price cache cleared")

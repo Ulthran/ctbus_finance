@@ -1,10 +1,14 @@
 import csv
+import logging
+
 import pandas as pd
 from ctbus_finance.db import get_session
 from ctbus_finance.models import AccountHolding, CreditCardHolding
 from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Set, List
+
+logger = logging.getLogger(__name__)
 
 
 def _parse_date(val: str | None, default: date | None = None) -> date | None:
@@ -26,6 +30,8 @@ def ingest_csv(fp: Path, table: str, default_date: date | None = None):
     if default_date is None:
         default_date = datetime.today().date()
 
+    logger.info("Ingesting %s into %s with default date %s", fp, table, default_date)
+
     session = get_session()
 
     if table == "account_holdings":
@@ -43,13 +49,13 @@ def ingest_csv(fp: Path, table: str, default_date: date | None = None):
             df.to_sql(table, con=session.bind, if_exists="append", index=False)
             session.commit()
         else:
-            print(f"No new rows to insert into {table}")
+            logger.info("No new rows to insert into %s", table)
 
     session.close()
 
 
 def load_account_holdings(fp: Path, default_date: date) -> List[AccountHolding]:
-    print("Processing account holdings...")
+    logger.info("Processing account holdings...")
     with open(fp, newline="") as f:
         reader = csv.DictReader(f)
         rows = [row for row in reader]
@@ -84,8 +90,10 @@ def load_account_holdings(fp: Path, default_date: date) -> List[AccountHolding]:
     # Download prices for the dates that need them
     if lookups:
         from ctbus_finance import yahoo_finance
+        logger.debug("Price lookups required: %s", lookups)
 
         for dt, symbols in lookups.items():
+            logger.debug("Fetching prices for %s on %s", symbols, dt)
             prices = yahoo_finance.download_prices_for_date(symbols, dt)
             for row in rows:
                 if row["holding_id"] not in symbols:
@@ -121,7 +129,7 @@ def load_account_holdings(fp: Path, default_date: date) -> List[AccountHolding]:
 
 
 def load_credit_card_holdings(fp: Path, default_date: date) -> List[CreditCardHolding]:
-    print("Processing credit card holdings...")
+    logger.info("Processing credit card holdings...")
     with open(fp, newline="") as f:
         reader = csv.DictReader(f)
         holdings: List[CreditCardHolding] = []

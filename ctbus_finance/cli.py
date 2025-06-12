@@ -1,10 +1,16 @@
 import argparse
+import logging
 import sys
 from datetime import datetime
+from pathlib import Path
+
 from ctbus_finance import __version__
 from ctbus_finance.db import create_database
 from ctbus_finance.ingest import ingest_csv
-from pathlib import Path
+
+
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
 
 
 def main():
