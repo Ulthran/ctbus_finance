@@ -161,16 +161,16 @@ def process_account_holdings(
 
     for index, row in df.iterrows():
         print(row["account_id"], row["holding_id"], row["purchase_date"])
-        df.loc[index, "quantity"] = float(row["quantity"])
+        df.at[index, "quantity"] = float(row["quantity"])
         if pd.isna(row["date"]):
-            df.loc[index, "date"] = default_date
+            df.at[index, "date"] = default_date
         if pd.isna(row["price"]):
             ticker = get_ticker_data(row["holding_id"])
-            df.loc[index, "price"] = get_price(
-                ticker, pd.to_datetime(df.loc[index, "date"])
+            df.at[index, "price"] = get_price(
+                ticker, pd.to_datetime(df.at[index, "date"])
             )
             if pd.notna(row["purchase_date"]):
-                df.loc[index, "purchase_date"] = datetime.strptime(
+                df.at[index, "purchase_date"] = datetime.strptime(
                     row["purchase_date"], "%Y-%m-%d"
                 ).date()
                 if res := session.scalars(
@@ -180,9 +180,9 @@ def process_account_holdings(
                     )
                     .filter(AccountHolding.purchase_price.is_not(None))
                 ).first():
-                    df.loc[index, "purchase_price"] = float(res)
+                    df.at[index, "purchase_price"] = float(res)
                 else:
-                    df.loc[index, "purchase_price"] = get_price(
+                    df.at[index, "purchase_price"] = get_price(
                         ticker, pd.to_datetime(row["purchase_date"])
                     )
     dates = df.pop("date")
@@ -222,7 +222,7 @@ def process_credit_card_holdings(
     print("Processing credit card holdings...")
     for index, row in df.iterrows():
         print(row["credit_card_id"], row["balance"], row["rewards"])
-        df.loc[index, "balance"] = float(row["balance"])
-        df.loc[index, "date"] = default_date
+        df.at[index, "balance"] = float(row["balance"])
+        df.at[index, "date"] = default_date
 
     return df

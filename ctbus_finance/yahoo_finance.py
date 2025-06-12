@@ -66,6 +66,7 @@ def get_prices_batch(ticker: str, dates: Iterable[datetime]) -> None:
                 raise
             time.sleep(1)
 
+    success_count = 0
     for d in unique_dates:
         if (ticker, d) in _PRICE_CACHE:
             continue
@@ -73,6 +74,11 @@ def get_prices_batch(ticker: str, dates: Iterable[datetime]) -> None:
         if not subset.empty:
             last_idx = subset.index[-1]
             _PRICE_CACHE[(ticker, d)] = round(subset.loc[last_idx]["Close"], 2)
+            success_count += 1
+
+    print(
+        f"Yahoo Finance: retrieved {success_count}/{len(unique_dates)} prices for {ticker}"
+    )
 
 
 def get_price(
