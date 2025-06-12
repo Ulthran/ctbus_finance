@@ -1,4 +1,3 @@
-import pandas as pd
 from ctbus_finance.db import get_session
 from ctbus_finance.models import AccountHolding, Holding
 from ctbus_finance.yahoo_finance import get_ticker_data, get_price
