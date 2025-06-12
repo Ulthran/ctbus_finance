@@ -20,7 +20,13 @@ ctbus_finance ingest_csv account_holdings_YYYY_MM_DD.csv account_holdings
 ctbus_finance ingest_csv credit_card_holdings_YYYY_MM_DD.csv credit_card_holdings
 ```
 
-Note that it will fill in today's date for `date` unless it is specified in the CSV. It will also try to fill purchase_price for each asset from previous entries (especially useful if you have things Yahoo finance can't identify, so it won't keep looking that up and failing).
+Use the optional `--date` argument to apply a specific date to all rows when your CSV doesn't include one:
+
+```
+ctbus_finance ingest_csv account_holdings_2024_01_01.csv account_holdings --date 2024-01-01
+```
+
+Note that it will fill in today's date for `date` unless it is specified in the CSV or provided via the `--date` option. It will also try to fill purchase_price for each asset from previous entries (especially useful if you have things Yahoo finance can't identify, so it won't keep looking that up and failing).
 
 ### Web interface
 
