@@ -82,9 +82,18 @@ def load_account_holdings(fp: Path, default_date: date) -> List[AccountHolding]:
             lookups.setdefault(pd_val, set()).add(row["holding_id"])
 
     # Download prices for the dates that need them
-    # NOT IMPLEMENTED
-    print(lookups)
-    assert False
+    if lookups:
+        from ctbus_finance import yahoo_finance
+
+        for dt, symbols in lookups.items():
+            prices = yahoo_finance.download_prices_for_date(symbols, dt)
+            for row in rows:
+                if row["holding_id"] not in symbols:
+                    continue
+                if row["date"] == dt and row["price"] is None:
+                    row["price"] = prices.get(row["holding_id"])
+                if row.get("purchase_date") == dt and row["purchase_price"] is None:
+                    row["purchase_price"] = prices.get(row["holding_id"])
 
     holdings: List[AccountHolding] = []
     for row in rows:
