@@ -10,11 +10,10 @@ from ctbus_finance.yahoo_finance import get_price, get_ticker_data
 
 
 def get_db_url() -> str:
-    try:
-        os.environ["CTBUS_FINANCE_DB_URI"]
-    except KeyError:
-        raise KeyError("CTBUS_FINANCE_DB_URI environment variable not set")
-    return os.environ["CTBUS_FINANCE_DB_URI"]
+    cwd = Path.cwd()
+    return os.environ.get(
+        "CTBUS_FINANCE_DB_URI", f"sqlite:///{cwd.resolve() / 'db.sqlite'}"
+    )
 
 
 def create_database(database_url: str = get_db_url()):

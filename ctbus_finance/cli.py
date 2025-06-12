@@ -72,9 +72,7 @@ def main():
             sys.stderr.write(f"Type {ingest_csv_args.type} is not recognized.\n")
             sys.exit(1)
 
-        default_date = datetime.strptime(
-            ingest_csv_args.date, "%Y-%m-%d"
-        ).date()
+        default_date = datetime.strptime(ingest_csv_args.date, "%Y-%m-%d").date()
         ingest_csv(
             fp=Path(ingest_csv_args.file_path),
             table=ingest_csv_args.type,

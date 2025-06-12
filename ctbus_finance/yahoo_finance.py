@@ -62,4 +62,3 @@ def get_price(
         for index in df.index:
             if index.date() <= date.date():
                 return round(df.loc[index]["Close"], 2)
-
