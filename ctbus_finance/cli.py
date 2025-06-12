@@ -81,3 +81,7 @@ def main():
     else:
         parser.print_help()
         sys.stderr.write("Unrecognized command.\n")
+
+
+if __name__ == "__main__":
+    main()

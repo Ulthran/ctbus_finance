@@ -16,7 +16,9 @@ def get_db_url() -> str:
     )
 
 
-def create_database(database_url: str = get_db_url()):
+def create_database(database_url: str | None = None):
+    if database_url is None:
+        database_url = get_db_url()
     """
     Create the database tables that don't exist using the provided database URL.
 
@@ -27,7 +29,9 @@ def create_database(database_url: str = get_db_url()):
     Base.metadata.create_all(engine, checkfirst=True)
 
 
-def get_connection(database_url: str = get_db_url()) -> Connection:
+def get_connection(database_url: str | None = None) -> Connection:
+    if database_url is None:
+        database_url = get_db_url()
     """
     Get a connection to the database using the provided database URL.
 
@@ -42,7 +46,9 @@ def get_connection(database_url: str = get_db_url()) -> Connection:
     return connection
 
 
-def get_session(database_url: str = get_db_url()) -> Session:
+def get_session(database_url: str | None = None) -> Session:
+    if database_url is None:
+        database_url = get_db_url()
     """
     Get a session to the database using the provided database URL.
 
@@ -72,7 +78,8 @@ def ingest_csv(fp: Path, table: str, default_date: date | None = None):
     if table == "credit_card_holdings":
         df = process_credit_card_holdings(df, session, default_date)
 
-    df.to_sql(table, con=session.bind, if_exists="replace", index=False)
+    mode = "append" if table in {"account_holdings", "credit_card_holdings"} else "replace"
+    df.to_sql(table, con=session.bind, if_exists=mode, index=False)
     session.commit()
     session.close()
 
@@ -108,7 +115,7 @@ def process_account_holdings(
                         ticker, datetime.strptime(row["purchase_date"], "%Y-%m-%d")
                     )
 
-        df.loc[index, "date"] = df.loc[index, "date"].date()
+        df.loc[index, "date"] = pd.to_datetime(df.loc[index, "date"]).date()
 
     dates = df.pop("date")
     df.insert(0, "date", dates)
