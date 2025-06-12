@@ -3,10 +3,15 @@ import pandas as pd
 from datetime import datetime, date
 from pathlib import Path
 from sqlalchemy import create_engine, select
+from typing import Dict, Set
 from sqlalchemy.engine import Connection
 from sqlalchemy.orm import Session
 from ctbus_finance.models import Base, AccountHolding, CreditCardHolding
-from ctbus_finance.yahoo_finance import get_price, get_ticker_data
+from ctbus_finance.yahoo_finance import (
+    get_price,
+    get_ticker_data,
+    get_prices_batch,
+)
 
 
 def get_db_url() -> str:
@@ -139,6 +144,21 @@ def process_account_holdings(
     print("Processing account holdings...")
     if "date" not in df.columns:
         df["date"] = default_date
+    # Determine which prices need to be looked up and batch those requests
+    lookup_dates: Dict[str, Set[datetime]] = {}
+    for _, row in df.iterrows():
+        symbol = row["holding_id"]
+        if pd.isna(row["price"]):
+            date_val = pd.to_datetime(
+                row["date"] if pd.notna(row["date"]) else default_date
+            )
+            lookup_dates.setdefault(symbol, set()).add(date_val)
+            if pd.notna(row["purchase_date"]):
+                lookup_dates[symbol].add(pd.to_datetime(row["purchase_date"]))
+
+    for symbol, dates in lookup_dates.items():
+        get_prices_batch(symbol, dates)
+
     for index, row in df.iterrows():
         print(row["account_id"], row["holding_id"], row["purchase_date"])
         df.loc[index, "quantity"] = float(row["quantity"])
@@ -146,12 +166,13 @@ def process_account_holdings(
             df.loc[index, "date"] = default_date
         if pd.isna(row["price"]):
             ticker = get_ticker_data(row["holding_id"])
-            df.loc[index, "price"] = get_price(ticker, df.loc[index, "date"])
+            df.loc[index, "price"] = get_price(
+                ticker, pd.to_datetime(df.loc[index, "date"])
+            )
             if pd.notna(row["purchase_date"]):
                 df.loc[index, "purchase_date"] = datetime.strptime(
                     row["purchase_date"], "%Y-%m-%d"
                 ).date()
-                # First try to access from previous entries in the db
                 if res := session.scalars(
                     select(AccountHolding.purchase_price)
                     .filter_by(
@@ -160,10 +181,9 @@ def process_account_holdings(
                     .filter(AccountHolding.purchase_price.is_not(None))
                 ).first():
                     df.loc[index, "purchase_price"] = float(res)
-                # Then look it up
                 else:
                     df.loc[index, "purchase_price"] = get_price(
-                        ticker, datetime.strptime(row["purchase_date"], "%Y-%m-%d")
+                        ticker, pd.to_datetime(row["purchase_date"])
                     )
     dates = df.pop("date")
     df.insert(0, "date", dates)
