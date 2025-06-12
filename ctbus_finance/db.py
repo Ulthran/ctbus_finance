@@ -137,6 +137,8 @@ def process_account_holdings(
     df: pd.DataFrame, session: Session, default_date: date
 ) -> pd.DataFrame:
     print("Processing account holdings...")
+    if "date" not in df.columns:
+        df["date"] = default_date
     for index, row in df.iterrows():
         print(row["account_id"], row["holding_id"], row["purchase_date"])
         df.loc[index, "quantity"] = float(row["quantity"])
@@ -163,9 +165,6 @@ def process_account_holdings(
                     df.loc[index, "purchase_price"] = get_price(
                         ticker, datetime.strptime(row["purchase_date"], "%Y-%m-%d")
                     )
-
-        df.loc[index, "date"] = df.loc[index, "date"].date()
-
     dates = df.pop("date")
     df.insert(0, "date", dates)
     print("Purchase date type:", df["purchase_date"].dtype)
