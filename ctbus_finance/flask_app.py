@@ -3,7 +3,7 @@ from ctbus_finance.views import (
     get_accounts,
     get_credit_cards,
     get_net_value,
-    get_monthly_net_worth,
+    get_monthly_summary,
 )
 
 
@@ -13,8 +13,8 @@ def create_app() -> Flask:
     @app.route("/")
     def index():
         net = get_net_value()
-        trend = get_monthly_net_worth()
-        return render_template("index.html", net_value=net, trend=trend)
+        trend = get_monthly_summary()
+        return render_template("index.html", net_value=net, summary=trend)
 
     @app.route("/accounts")
     def accounts():
