@@ -143,8 +143,63 @@ def get_monthly_net_worth() -> list[tuple[str, float]]:
     return result
 
 
+def get_monthly_summary() -> list[tuple[str, float, float, float]]:
+    """Return net worth, cash value, and credit card totals grouped by month."""
+    session = get_session()
+
+    account_sums = (
+        session.query(
+            extract("year", AccountHolding.date).label("year"),
+            extract("month", AccountHolding.date).label("month"),
+            func.sum(AccountHolding.quantity * AccountHolding.price).label("total"),
+        )
+        .group_by("year", "month")
+        .all()
+    )
+
+    cash_sums = (
+        session.query(
+            extract("year", AccountHolding.date).label("year"),
+            extract("month", AccountHolding.date).label("month"),
+            func.sum(AccountHolding.quantity * AccountHolding.price).label("total"),
+        )
+        .join(Holding, AccountHolding.holding_id == Holding.symbol)
+        .filter(func.lower(Holding.asset_type) == "cash")
+        .group_by("year", "month")
+        .all()
+    )
+
+    credit_sums = (
+        session.query(
+            extract("year", CreditCardHolding.date).label("year"),
+            extract("month", CreditCardHolding.date).label("month"),
+            func.sum(CreditCardHolding.balance).label("total"),
+        )
+        .group_by("year", "month")
+        .all()
+    )
+
+    acc = {(int(y), int(m)): float(t or 0) for y, m, t in account_sums}
+    cash = {(int(y), int(m)): float(t or 0) for y, m, t in cash_sums}
+    cc = {(int(y), int(m)): float(t or 0) for y, m, t in credit_sums}
+    all_months = sorted(set(acc.keys()) | set(cash.keys()) | set(cc.keys()))
+
+    result: list[tuple[str, float, float, float]] = []
+    for y, m in all_months:
+        dt = datetime(int(y), int(m), 1)
+        label = dt.strftime("%Y-%m")
+        total_accounts = acc.get((y, m), 0.0)
+        cash_val = cash.get((y, m), 0.0)
+        credit_val = cc.get((y, m), 0.0)
+        net = round(total_accounts - credit_val, 2)
+        result.append((label, net, cash_val, credit_val))
+    session.close()
+    return result
+
+
 if __name__ == "__main__":
     print(get_accounts())
     print(get_credit_cards())
     print(get_net_value())
     print(get_monthly_net_worth())
+    print(get_monthly_summary())

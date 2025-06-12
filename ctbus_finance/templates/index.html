@@ -2,18 +2,32 @@
 <html>
 <head>
     <title>ctbus_finance Dashboard</title>
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
 </head>
 <body>
     <h1>ctbus_finance Dashboard</h1>
     <p>Net Worth: {{ net_value }}</p>
 
-    <h2>Net Worth Trend</h2>
-    <table>
-        <tr><th>Month</th><th>Net Worth</th></tr>
-        {% for month, value in trend %}
-        <tr><td>{{ month }}</td><td>{{ value }}</td></tr>
-        {% endfor %}
-    </table>
+    <h2>Monthly Trends</h2>
+    <canvas id="trendChart" width="600" height="300"></canvas>
+    <script>
+        const labels = {{ summary | map(attribute=0) | list | tojson }};
+        const netData = {{ summary | map(attribute=1) | list | tojson }};
+        const cashData = {{ summary | map(attribute=2) | list | tojson }};
+        const ccData = {{ summary | map(attribute=3) | list | tojson }};
+        new Chart(document.getElementById('trendChart'), {
+            type: 'line',
+            data: {
+                labels: labels,
+                datasets: [
+                    {label: 'Net Worth', data: netData, borderColor: 'blue', fill: false},
+                    {label: 'Cash Value', data: cashData, borderColor: 'green', fill: false},
+                    {label: 'Credit Card Spending', data: ccData, borderColor: 'red', fill: false}
+                ]
+            },
+            options: {scales: {y: {beginAtZero: true}}}
+        });
+    </script>
 
     <p>
         <a href="{{ url_for('accounts') }}">Accounts</a> |
