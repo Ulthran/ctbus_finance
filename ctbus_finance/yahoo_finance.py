@@ -86,7 +86,8 @@ def get_prices_batch(ticker: str, dates: Iterable[datetime]) -> None:
         if (ticker, d) in _PRICE_CACHE:
             continue
         if d not in df.index.date:
-            raise ValueError(f"No price data for {ticker} on {d}")
+            print(f"Yahoo Finance: no price data for {ticker} on {d}")
+            continue
         _PRICE_CACHE[(ticker, d)] = round(df.loc[str(d)]["Close"], 2)
         success_count += 1
 
@@ -195,7 +196,8 @@ def download_prices_for_date(
         for t in missing:
             data = df if len(missing) == 1 else df[t]
             if date not in data.index:
-                raise ValueError(f"No price data for {t} on {date}")
+                print(f"Yahoo Finance: no price data for {t} on {date}")
+                continue
             price = round(data.loc[date]["Close"], 2)
             _PRICE_CACHE[(t, date)] = price
 
