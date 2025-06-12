@@ -4,6 +4,8 @@ from ctbus_finance.views import (
     get_credit_cards,
     get_net_value,
     get_monthly_net_worth,
+    get_monthly_cash,
+    get_monthly_credit_card_totals,
 )
 
 
@@ -13,8 +15,27 @@ def create_app() -> Flask:
     @app.route("/")
     def index():
         net = get_net_value()
-        trend = get_monthly_net_worth()
-        return render_template("index.html", net_value=net, trend=trend)
+        net_trend = get_monthly_net_worth()
+        cash_trend = get_monthly_cash()
+        cc_trend = get_monthly_credit_card_totals()
+
+        net_dict = dict(net_trend)
+        cash_dict = dict(cash_trend)
+        cc_dict = dict(cc_trend)
+        labels = sorted(set(net_dict) | set(cash_dict) | set(cc_dict))
+
+        net_values = [net_dict.get(m, 0) for m in labels]
+        cash_values = [cash_dict.get(m, 0) for m in labels]
+        cc_values = [cc_dict.get(m, 0) for m in labels]
+
+        return render_template(
+            "index.html",
+            net_value=net,
+            labels=labels,
+            net_values=net_values,
+            cash_values=cash_values,
+            cc_values=cc_values,
+        )
 
     @app.route("/accounts")
     def accounts():

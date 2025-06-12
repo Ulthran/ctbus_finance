@@ -143,6 +143,48 @@ def get_monthly_net_worth() -> list[tuple[str, float]]:
     return result
 
 
+def get_monthly_cash() -> list[tuple[str, float]]:
+    """Return total cash value grouped by month."""
+    session = get_session()
+    cash_sums = (
+        session.query(
+            extract("year", AccountHolding.date).label("year"),
+            extract("month", AccountHolding.date).label("month"),
+            func.sum(AccountHolding.quantity * AccountHolding.price).label("total"),
+        )
+        .join(Holding, AccountHolding.holding_id == Holding.symbol)
+        .filter(Holding.asset_type.ilike("cash%"))
+        .group_by("year", "month")
+        .all()
+    )
+    result = []
+    for y, m, total in cash_sums:
+        dt = datetime(int(y), int(m), 1)
+        result.append((dt.strftime("%Y-%m"), round(float(total or 0), 2)))
+    session.close()
+    return result
+
+
+def get_monthly_credit_card_totals() -> list[tuple[str, float]]:
+    """Return total credit card balances grouped by month."""
+    session = get_session()
+    credit_sums = (
+        session.query(
+            extract("year", CreditCardHolding.date).label("year"),
+            extract("month", CreditCardHolding.date).label("month"),
+            func.sum(CreditCardHolding.balance).label("total"),
+        )
+        .group_by("year", "month")
+        .all()
+    )
+    result = []
+    for y, m, total in credit_sums:
+        dt = datetime(int(y), int(m), 1)
+        result.append((dt.strftime("%Y-%m"), round(float(total or 0), 2)))
+    session.close()
+    return result
+
+
 if __name__ == "__main__":
     print(get_accounts())
     print(get_credit_cards())
