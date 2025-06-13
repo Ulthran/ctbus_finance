@@ -12,7 +12,10 @@ from __future__ import annotations
 import logging
 import time
 from datetime import date, timedelta
-from typing import Dict, Iterable
+from typing import Dict, Iterable, List
+
+from ctbus_finance.db import get_session
+from ctbus_finance.models import PriceCache
 
 import yfinance as yf
 from yfinance.exceptions import YFRateLimitError
@@ -23,9 +26,16 @@ logger = logging.getLogger(__name__)
 # places to avoid small floating point differences from yfinance.
 _PRICE_CACHE: Dict[tuple[str, date], float] = {}
 
+# How many tickers to fetch per Yahoo Finance request.  Smaller batches help
+# avoid rate limiting when requesting many symbols at once.
+_BATCH_SIZE = 10
+
+# Seconds to wait between batches
+_BATCH_DELAY = 1.0
+
 
 def download_prices_for_date(
-    tickers: Iterable[str], on_date: date, max_retries: int = 5
+    tickers: Iterable[str], on_date: date, max_retries: int = 8
 ) -> Dict[str, float]:
     """Return closing prices for ``tickers`` on ``on_date``.
 
@@ -39,61 +49,85 @@ def download_prices_for_date(
 
     unique = sorted({t.upper() for t in tickers})
     logger.debug("Fetching prices for %s on %s", unique, on_date)
-    missing = [t for t in unique if (t, on_date) not in _PRICE_CACHE]
+
+    session = get_session()
+    missing: List[str] = []
+    for t in unique:
+        if (t, on_date) in _PRICE_CACHE:
+            continue
+        cached = (
+            session.query(PriceCache)
+            .filter_by(symbol=t, date=on_date)
+            .first()
+        )
+        if cached:
+            _PRICE_CACHE[(t, on_date)] = cached.price
+        else:
+            missing.append(t)
+
     if missing:
         logger.debug("Missing from cache: %s", missing)
     if missing:
         if on_date.weekday() >= 5:
-            # Markets are closed on weekends
+            session.close()
             raise ValueError(f"{on_date} is not a trading day")
 
-        attempts = 0
-        while True:
-            try:
-                df = yf.download(
-                    missing,
-                    start=on_date,
-                    end=on_date + timedelta(days=1),
-                    progress=False,
-                    group_by="ticker",
-                    actions=False,
-                    auto_adjust=False,
-                    threads=False,
-                )
-                logger.debug("Fetched data for %s on %s", missing, on_date)
-                break
-            except YFRateLimitError:
-                attempts += 1
-                logger.warning(
-                    "Rate limited fetching %s on %s (attempt %d)",
-                    missing,
-                    on_date,
-                    attempts,
-                )
-                if attempts >= max_retries:
-                    raise
-                time.sleep(2**attempts)
-            except Exception as exc:
-                attempts += 1
-                logger.warning(
-                    "Error fetching %s on %s: %s (attempt %d)",
-                    missing,
-                    on_date,
-                    exc,
-                    attempts,
-                )
-                if attempts >= max_retries:
-                    raise
-                time.sleep(1)
+        for i in range(0, len(missing), _BATCH_SIZE):
+            batch = missing[i : i + _BATCH_SIZE]
+            attempts = 0
+            while True:
+                try:
+                    df = yf.download(
+                        batch,
+                        start=on_date,
+                        end=on_date + timedelta(days=1),
+                        progress=False,
+                        group_by="ticker",
+                        actions=False,
+                        auto_adjust=False,
+                        threads=False,
+                    )
+                    logger.debug("Fetched data for %s on %s", batch, on_date)
+                    break
+                except YFRateLimitError:
+                    attempts += 1
+                    logger.warning(
+                        "Rate limited fetching %s on %s (attempt %d)",
+                        batch,
+                        on_date,
+                        attempts,
+                    )
+                    if attempts >= max_retries:
+                        session.close()
+                        raise
+                    time.sleep(2**attempts)
+                except Exception as exc:
+                    attempts += 1
+                    logger.warning(
+                        "Error fetching %s on %s: %s (attempt %d)",
+                        batch,
+                        on_date,
+                        exc,
+                        attempts,
+                    )
+                    if attempts >= max_retries:
+                        session.close()
+                        raise
+                    time.sleep(1)
 
-        for t in missing:
-            data = df if len(missing) == 1 else df[t]
-            if on_date not in data.index:
-                # Yahoo occasionally omits prices (holidays etc.).  Skip silently.
-                continue
-            price = round(float(data.loc[on_date]["Close"]), 2)
-            _PRICE_CACHE[(t, on_date)] = price
-            logger.debug("Cached price for %s on %s: %s", t, on_date, price)
+            for t in batch:
+                data = df if len(batch) == 1 else df[t]
+                if on_date not in data.index:
+                    continue
+                price = round(float(data.loc[on_date]["Close"]), 2)
+                _PRICE_CACHE[(t, on_date)] = price
+                session.merge(PriceCache(symbol=t, date=on_date, price=price))
+                logger.debug("Cached price for %s on %s: %s", t, on_date, price)
+
+            session.commit()
+            time.sleep(_BATCH_DELAY)
+
+    session.close()
 
     result = {
         t: _PRICE_CACHE[(t, on_date)] for t in unique if (t, on_date) in _PRICE_CACHE
@@ -115,4 +149,8 @@ def clear_cache() -> None:
     """Remove all cached price data."""
 
     _PRICE_CACHE.clear()
+    session = get_session()
+    session.query(PriceCache).delete()
+    session.commit()
+    session.close()
     logger.debug("Price cache cleared")

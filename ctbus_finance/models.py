@@ -120,3 +120,14 @@ class CreditCardHolding(Base):
     @property
     def total_value(self):
         return (self.rewards if self.rewards else 0) - self.balance
+
+
+class PriceCache(Base):
+    """Persisted price data fetched from Yahoo Finance."""
+
+    __tablename__ = "price_cache"
+
+    symbol = Column(String, primary_key=True, nullable=False)
+    date = Column(Date, primary_key=True, nullable=False)
+    price = Column(Float, nullable=False)
+
