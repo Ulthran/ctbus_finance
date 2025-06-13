@@ -7,7 +7,7 @@ from ctbus_finance.models import (
     Holding,
 )
 from datetime import datetime
-from sqlalchemy import extract, func
+from sqlalchemy import extract, func, case
 from sqlalchemy.orm import Session
 
 
@@ -157,14 +157,23 @@ def get_monthly_summary() -> list[tuple[str, float, float, float]]:
         .all()
     )
 
+    cash_fraction = case(
+        (
+            func.lower(Holding.asset_type).in_(["cash", "money market"]),
+            1,
+        ),
+        else_=func.coalesce(AccountHolding.percentage_cash, 0) / 100,
+    )
+
     cash_sums = (
         session.query(
             extract("year", AccountHolding.date).label("year"),
             extract("month", AccountHolding.date).label("month"),
-            func.sum(AccountHolding.quantity * AccountHolding.price).label("total"),
+            func.sum(
+                AccountHolding.quantity * AccountHolding.price * cash_fraction
+            ).label("total"),
         )
         .join(Holding, AccountHolding.holding_id == Holding.symbol)
-        .filter(func.lower(Holding.asset_type) == "cash")
         .group_by("year", "month")
         .all()
     )
