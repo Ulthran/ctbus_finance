@@ -122,6 +122,11 @@ def download_prices_for_date(
             for t in batch:
                 try:
                     data = df if len(batch) == 1 else df[t]
+                    if len(batch) == 1 and isinstance(df.columns, pd.MultiIndex):
+                        if t in df.columns.get_level_values(0):
+                            data = df[t]
+                        elif t in df.columns.get_level_values(-1):
+                            data = df.xs(t, level=-1, axis=1)
                     idx_no_tz = (
                         data.index.tz_localize(None) if data.index.tz else data.index
                     )
