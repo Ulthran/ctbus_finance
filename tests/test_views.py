@@ -9,7 +9,11 @@ from ctbus_finance.models import (
     CreditCard,
     CreditCardHolding,
 )
-from ctbus_finance.views import get_monthly_summary
+from ctbus_finance.views import (
+    get_monthly_summary,
+    get_monthly_percentage_totals,
+    get_monthly_asset_type_totals,
+)
 
 
 def setup_simple_db(tmp_path):
@@ -55,6 +59,28 @@ def setup_simple_db(tmp_path):
     session.close()
 
 
+def setup_nan_price_db(tmp_path):
+    path = tmp_path / "nan.sqlite"
+    os.environ["CTBUS_FINANCE_DB_URI"] = f"sqlite:///{path}"
+    create_database()
+    session = get_session()
+    session.add(Account(name="A", type="brokerage", institution="x"))
+    session.add(Holding(symbol="ETF", name="ETF", asset_type="ETF"))
+    session.commit()
+    session.add(
+        AccountHolding(
+            account_id="A",
+            holding_id="ETF",
+            date=date(2024, 1, 1),
+            purchase_date=None,
+            quantity=10,
+            price=float("nan"),
+        )
+    )
+    session.commit()
+    session.close()
+
+
 def setup_money_market_db(tmp_path):
     path = tmp_path / "mm.sqlite"
     os.environ["CTBUS_FINANCE_DB_URI"] = f"sqlite:///{path}"
@@ -80,10 +106,28 @@ def setup_money_market_db(tmp_path):
 def test_monthly_summary_percentage_cash(tmp_path):
     setup_simple_db(tmp_path)
     summary = get_monthly_summary()
-    assert summary == [("2024-01", 1050.0, 600.0, 50.0)]
+    assert summary == [("2024-01", 1050.0, 500.0, 50.0)]
 
 
 def test_monthly_summary_money_market(tmp_path):
     setup_money_market_db(tmp_path)
     summary = get_monthly_summary()
-    assert summary == [("2024-01", 100.0, 100.0, 0.0)]
+    assert summary == [("2024-01", 100.0, 0.0, 0.0)]
+
+
+def test_percentage_totals(tmp_path):
+    setup_simple_db(tmp_path)
+    totals = get_monthly_percentage_totals("percentage_cash")
+    assert totals == { (2024, 1): 500.0 }
+
+
+def test_asset_type_totals(tmp_path):
+    setup_money_market_db(tmp_path)
+    totals = get_monthly_asset_type_totals(["money market"])
+    assert totals == { (2024, 1): 100.0 }
+
+
+def test_nan_price_handled(tmp_path):
+    setup_nan_price_db(tmp_path)
+    summary = get_monthly_summary()
+    assert summary == [("2024-01", 0.0, 0.0, 0.0)]

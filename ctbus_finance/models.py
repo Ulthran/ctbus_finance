@@ -1,3 +1,4 @@
+import math
 from sqlalchemy import (
     Column,
     String,
@@ -86,13 +87,17 @@ class AccountHolding(Base):
 
     @property
     def total_value(self):
-        if not self.price:
+        if self.price is None or (isinstance(self.price, float) and math.isnan(self.price)):
             return 0
         return self.quantity * self.price
 
     @property
     def gain_loss(self):
-        if self.purchase_price and self.price:
+        if (
+            self.purchase_price is not None
+            and self.price is not None
+            and not (isinstance(self.price, float) and math.isnan(self.price))
+        ):
             return (self.price - self.purchase_price) * self.quantity
         return None
 
