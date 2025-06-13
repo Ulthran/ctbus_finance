@@ -143,6 +143,63 @@ def get_monthly_net_worth() -> list[tuple[str, float]]:
     return result
 
 
+def get_monthly_percentage_totals(
+    column: str, session: Session | None = None
+) -> dict[tuple[int, int], float]:
+    """Return totals grouped by month based on a percentage column."""
+    own_session = False
+    if session is None:
+        session = get_session()
+        own_session = True
+
+    percentage_col = getattr(AccountHolding, column)
+    sums = (
+        session.query(
+            extract("year", AccountHolding.date).label("year"),
+            extract("month", AccountHolding.date).label("month"),
+            func.sum(
+                AccountHolding.quantity
+                * AccountHolding.price
+                * func.coalesce(percentage_col, 0)
+                / 100
+            ).label("total"),
+        )
+        .group_by("year", "month")
+        .all()
+    )
+    result = {(int(y), int(m)): float(t or 0) for y, m, t in sums}
+    if own_session:
+        session.close()
+    return result
+
+
+def get_monthly_asset_type_totals(
+    asset_types: list[str], session: Session | None = None
+) -> dict[tuple[int, int], float]:
+    """Return totals grouped by month for given asset types."""
+    own_session = False
+    if session is None:
+        session = get_session()
+        own_session = True
+
+    lower_types = [t.lower() for t in asset_types]
+    sums = (
+        session.query(
+            extract("year", AccountHolding.date).label("year"),
+            extract("month", AccountHolding.date).label("month"),
+            func.sum(AccountHolding.quantity * AccountHolding.price).label("total"),
+        )
+        .join(Holding, AccountHolding.holding_id == Holding.symbol)
+        .filter(func.lower(Holding.asset_type).in_(lower_types))
+        .group_by("year", "month")
+        .all()
+    )
+    result = {(int(y), int(m)): float(t or 0) for y, m, t in sums}
+    if own_session:
+        session.close()
+    return result
+
+
 def get_monthly_summary() -> list[tuple[str, float, float, float]]:
     """Return net worth, cash value, and credit card totals grouped by month."""
     session = get_session()
@@ -157,26 +214,7 @@ def get_monthly_summary() -> list[tuple[str, float, float, float]]:
         .all()
     )
 
-    cash_fraction = case(
-        (
-            func.lower(Holding.asset_type).in_(["cash", "money market"]),
-            1,
-        ),
-        else_=func.coalesce(AccountHolding.percentage_cash, 0) / 100,
-    )
-
-    cash_sums = (
-        session.query(
-            extract("year", AccountHolding.date).label("year"),
-            extract("month", AccountHolding.date).label("month"),
-            func.sum(
-                AccountHolding.quantity * AccountHolding.price * cash_fraction
-            ).label("total"),
-        )
-        .join(Holding, AccountHolding.holding_id == Holding.symbol)
-        .group_by("year", "month")
-        .all()
-    )
+    cash_dict = get_monthly_percentage_totals("percentage_cash", session)
 
     credit_sums = (
         session.query(
@@ -189,7 +227,7 @@ def get_monthly_summary() -> list[tuple[str, float, float, float]]:
     )
 
     acc = {(int(y), int(m)): float(t or 0) for y, m, t in account_sums}
-    cash = {(int(y), int(m)): float(t or 0) for y, m, t in cash_sums}
+    cash = cash_dict
     cc = {(int(y), int(m)): float(t or 0) for y, m, t in credit_sums}
     all_months = sorted(set(acc.keys()) | set(cash.keys()) | set(cc.keys()))
 
