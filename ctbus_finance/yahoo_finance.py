@@ -120,14 +120,21 @@ def download_prices_for_date(
                     time.sleep(1)
 
             for t in batch:
-                data = df if len(batch) == 1 else df[t]
-                idx_no_tz = (
-                    data.index.tz_localize(None) if data.index.tz else data.index
-                )
-                if pd.Timestamp(on_date) not in idx_no_tz:
+                try:
+                    data = df if len(batch) == 1 else df[t]
+                    idx_no_tz = (
+                        data.index.tz_localize(None) if data.index.tz else data.index
+                    )
+                    if pd.Timestamp(on_date) not in idx_no_tz:
+                        continue
+                    loc = data.index[idx_no_tz.get_loc(pd.Timestamp(on_date))]
+                    price = round(float(data.loc[loc]["Close"]), 2)
+                except Exception as exc:  # noqa: PERF203
+                    logger.warning(
+                        "Failed to fetch price for %s on %s: %s", t, on_date, exc
+                    )
                     continue
-                loc = data.index[idx_no_tz.get_loc(pd.Timestamp(on_date))]
-                price = round(float(data.loc[loc]["Close"]), 2)
+
                 _PRICE_CACHE[(t, on_date)] = price
                 session.merge(PriceCache(symbol=t, date=on_date, price=price))
                 logger.debug("Cached price for %s on %s: %s", t, on_date, price)

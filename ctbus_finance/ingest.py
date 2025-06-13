@@ -90,6 +90,7 @@ def load_account_holdings(fp: Path, default_date: date) -> List[AccountHolding]:
     # Download prices for the dates that need them
     if lookups:
         from ctbus_finance import yahoo_finance
+
         logger.debug("Price lookups required: %s", lookups)
 
         for dt, symbols in lookups.items():

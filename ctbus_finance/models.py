@@ -130,4 +130,3 @@ class PriceCache(Base):
     symbol = Column(String, primary_key=True, nullable=False)
     date = Column(Date, primary_key=True, nullable=False)
     price = Column(Float, nullable=False)
-
