@@ -10,6 +10,7 @@ ingesting account holdings.
 from __future__ import annotations
 
 import logging
+import math
 import time
 from datetime import date, timedelta
 from typing import Dict, Iterable, List
@@ -133,7 +134,13 @@ def download_prices_for_date(
                     if pd.Timestamp(on_date) not in idx_no_tz:
                         continue
                     loc = data.index[idx_no_tz.get_loc(pd.Timestamp(on_date))]
-                    price = round(float(data.loc[loc]["Close"]), 2)
+                    price_value = float(data.loc[loc]["Close"])
+                    if math.isnan(price_value):
+                        logger.warning(
+                            "NaN price returned for %s on %s, skipping", t, on_date
+                        )
+                        continue
+                    price = round(price_value, 2)
                 except Exception as exc:  # noqa: PERF203
                     logger.warning(
                         "Failed to fetch price for %s on %s: %s", t, on_date, exc

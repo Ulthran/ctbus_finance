@@ -55,7 +55,7 @@ class AccountHolding(Base):
     purchase_date = Column(Date, primary_key=True, nullable=True)
 
     quantity = Column(Float, nullable=False)  # Number of shares/units
-    price = Column(Float, nullable=False)  # Price per share/unit
+    price = Column(Float, nullable=True)  # Price per share/unit
     purchase_price = Column(
         Float, nullable=True
     )  # Price at which the asset was purchased
@@ -86,11 +86,13 @@ class AccountHolding(Base):
 
     @property
     def total_value(self):
+        if not self.price:
+            return 0
         return self.quantity * self.price
 
     @property
     def gain_loss(self):
-        if self.purchase_price:
+        if self.purchase_price and self.price:
             return (self.price - self.purchase_price) * self.quantity
         return None
 
