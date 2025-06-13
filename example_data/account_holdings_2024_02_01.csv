@@ -8,3 +8,6 @@ date,account_id,holding_id,quantity,price,purchase_date,purchase_price,percentag
 2024-02-01,Roth IRA,VXUS,7,52,2022-02-10,40,0,0,0,0,0,0,0,
 2024-02-01,Roth IRA,BND,10,76,2022-03-10,65,0,0,0,0,0,0,0,
 2024-02-01,Roth IRA,CASH,550,1,2024-01-01,1,0,0,0,0,0,0,0,
+2024-02-01,Brokerage,ADP,5,250,2001-06-01,30,0,0,0,0,0,0,0,
+2024-02-01,Brokerage,SPAXX,1000,1,2024-01-01,1,0,0,0,0,0,0,0,
+2024-02-01,Brokerage,IBM,4,172,2023-11-10,165,0,0,0,0,0,0,0,
