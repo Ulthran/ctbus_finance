@@ -9,7 +9,7 @@ from ctbus_finance.db import create_database
 from ctbus_finance.ingest import ingest_csv
 
 
-logging.basicConfig(level=logging.INFO)
+logging.basicConfig(level=logging.DEBUG)
 logger = logging.getLogger(__name__)
 
 
