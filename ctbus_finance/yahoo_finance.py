@@ -14,6 +14,9 @@ import time
 from datetime import date, timedelta
 from typing import Dict, Iterable, List
 
+from curl_cffi import requests as curl_requests
+import pandas as pd
+
 from ctbus_finance.db import get_session
 from ctbus_finance.models import PriceCache
 
@@ -32,6 +35,10 @@ _BATCH_SIZE = 10
 
 # Seconds to wait between batches
 _BATCH_DELAY = 1.0
+
+# Use a single session with a consistent User-Agent to avoid Yahoo rate
+# limiting triggered by fingerprint changes.
+_SESSION = curl_requests.Session(impersonate="chrome")
 
 
 def download_prices_for_date(
@@ -55,11 +62,7 @@ def download_prices_for_date(
     for t in unique:
         if (t, on_date) in _PRICE_CACHE:
             continue
-        cached = (
-            session.query(PriceCache)
-            .filter_by(symbol=t, date=on_date)
-            .first()
-        )
+        cached = session.query(PriceCache).filter_by(symbol=t, date=on_date).first()
         if cached:
             _PRICE_CACHE[(t, on_date)] = cached.price
         else:
@@ -86,6 +89,7 @@ def download_prices_for_date(
                         actions=False,
                         auto_adjust=False,
                         threads=False,
+                        session=_SESSION,
                     )
                     logger.debug("Fetched data for %s on %s", batch, on_date)
                     break
@@ -117,9 +121,13 @@ def download_prices_for_date(
 
             for t in batch:
                 data = df if len(batch) == 1 else df[t]
-                if on_date not in data.index:
+                idx_no_tz = (
+                    data.index.tz_localize(None) if data.index.tz else data.index
+                )
+                if pd.Timestamp(on_date) not in idx_no_tz:
                     continue
-                price = round(float(data.loc[on_date]["Close"]), 2)
+                loc = data.index[idx_no_tz.get_loc(pd.Timestamp(on_date))]
+                price = round(float(data.loc[loc]["Close"]), 2)
                 _PRICE_CACHE[(t, on_date)] = price
                 session.merge(PriceCache(symbol=t, date=on_date, price=price))
                 logger.debug("Cached price for %s on %s: %s", t, on_date, price)
