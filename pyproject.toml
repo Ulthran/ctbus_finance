@@ -3,7 +3,7 @@ name = "ctbus_finance"
 description = "A Python library for defining and interacting with a personal finance database."
 dynamic = ["version"]
 dependencies = [
-    "morningstar-data==1.10.6",
+    "morningstar-data==1.11.0",
     "pandas==2.2.3",
     "SQLAlchemy==2.0.39",
     "yfinance==0.2.63",
