@@ -6,6 +6,7 @@ from sqlalchemy import (
     ForeignKey,
     UniqueConstraint,
     Date,
+    Integer,
 )
 from sqlalchemy.orm import relationship, declarative_base
 
@@ -137,3 +138,23 @@ class PriceCache(Base):
     symbol = Column(String, primary_key=True, nullable=False)
     date = Column(Date, primary_key=True, nullable=False)
     price = Column(Float, nullable=False)
+
+
+class CapitalOneTransaction(Base):
+    __tablename__ = "capitalone_transactions"
+    __table_args__ = (
+        UniqueConstraint(
+            "account",
+            "date",
+            "description",
+            "amount",
+            name="uix_capitalone_txn",
+        ),
+    )
+
+    id = Column(Integer, primary_key=True, autoincrement=True)
+    account = Column(String, nullable=True)
+    date = Column(Date, nullable=False)
+    description = Column(String, nullable=False)
+    category = Column(String, nullable=True)
+    amount = Column(Float, nullable=False)

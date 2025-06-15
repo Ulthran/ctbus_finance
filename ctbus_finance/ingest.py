@@ -3,7 +3,11 @@ import logging
 
 import pandas as pd
 from ctbus_finance.db import get_session
-from ctbus_finance.models import AccountHolding, CreditCardHolding
+from ctbus_finance.models import (
+    AccountHolding,
+    CreditCardHolding,
+    CapitalOneTransaction,
+)
 from datetime import datetime, date
 from pathlib import Path
 from typing import Dict, Set, List
@@ -42,6 +46,10 @@ def ingest_csv(fp: Path, table: str, default_date: date | None = None):
     elif table == "credit_card_holdings":
         holdings = load_credit_card_holdings(fp, default_date)
         session.add_all(holdings)
+        session.commit()
+    elif table == "capitalone_transactions":
+        txns = load_capitalone_transactions(fp, session)
+        session.add_all(txns)
         session.commit()
     else:
         df = pd.read_csv(fp)
@@ -145,3 +153,49 @@ def load_credit_card_holdings(fp: Path, default_date: date) -> List[CreditCardHo
             )
 
     return holdings
+
+
+def load_capitalone_transactions(
+    fp: Path, session
+) -> List[CapitalOneTransaction]:
+    """Parse a CapitalOne statement CSV and skip duplicates."""
+    logger.info("Processing CapitalOne transactions...")
+    with open(fp, newline="") as f:
+        reader = csv.DictReader(f)
+        txns: List[CapitalOneTransaction] = []
+        for row in reader:
+            date_val = _parse_date(row.get("Transaction Date"))
+            if date_val is None:
+                continue
+            debit = _parse_float(row.get("Debit")) or 0.0
+            credit = _parse_float(row.get("Credit")) or 0.0
+            amount = credit - debit
+            if "Amount" in row and row.get("Amount"):
+                amt = _parse_float(row.get("Amount"))
+                if amt is not None:
+                    amount = amt
+
+            exists = (
+                session.query(CapitalOneTransaction)
+                .filter_by(
+                    account=row.get("Account"),
+                    date=date_val,
+                    description=row.get("Description", ""),
+                    amount=amount,
+                )
+                .first()
+            )
+            if exists:
+                continue
+
+            txns.append(
+                CapitalOneTransaction(
+                    account=row.get("Account"),
+                    date=date_val,
+                    description=row.get("Description", ""),
+                    category=row.get("Category"),
+                    amount=amount,
+                )
+            )
+
+    return txns
