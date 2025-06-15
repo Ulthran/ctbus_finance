@@ -4,6 +4,7 @@ from ctbus_finance.models import (
     AccountHolding,
     CreditCard,
     CreditCardHolding,
+    CapitalOneTransaction,
     Holding,
 )
 from datetime import datetime
@@ -244,9 +245,26 @@ def get_monthly_summary() -> list[tuple[str, float, float, float]]:
     return result
 
 
+def get_capitalone_category_totals() -> list[tuple[str, float]]:
+    """Return summed transaction amounts grouped by category."""
+    session = get_session()
+    rows = (
+        session.query(
+            CapitalOneTransaction.category,
+            func.sum(CapitalOneTransaction.amount).label("total"),
+        )
+        .group_by(CapitalOneTransaction.category)
+        .all()
+    )
+    result = [((c or "Uncategorized"), float(t or 0)) for c, t in rows]
+    session.close()
+    return result
+
+
 if __name__ == "__main__":
     print(get_accounts())
     print(get_credit_cards())
     print(get_net_value())
     print(get_monthly_net_worth())
     print(get_monthly_summary())
+    print(get_capitalone_category_totals())

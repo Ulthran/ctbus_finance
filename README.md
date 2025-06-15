@@ -18,6 +18,7 @@ You can add more later by adding to the CSVs and then rerunning the above (it wo
 ```
 ctbus_finance ingest_csv account_holdings_YYYY_MM_DD.csv account_holdings
 ctbus_finance ingest_csv credit_card_holdings_YYYY_MM_DD.csv credit_card_holdings
+ctbus_finance ingest_csv capitalone_transactions.csv capitalone_transactions
 ```
 
 Use the optional `--date` argument to apply a specific date to all rows when your CSV doesn't include one:
@@ -27,6 +28,14 @@ ctbus_finance ingest_csv account_holdings_2024_01_01.csv account_holdings --date
 ```
 
 Note that it will fill in today's date for `date` unless it is specified in the CSV or provided via the `--date` option. It will also try to fill purchase_price for each asset from previous entries (especially useful if you have things Yahoo finance can't identify, so it won't keep looking that up and failing).
+
+CapitalOne statement CSVs can also be imported using:
+
+```
+ctbus_finance ingest_csv capitalone_transactions.csv capitalone_transactions
+```
+
+Debit amounts are stored as negative values and credits as positive. Duplicate rows are ignored via a unique constraint.
 
 Yahoo Finance imposes strict rate limits and the `yfinance` library does not provide a supported way to raise them. This project caches results and retries requests when possible, but bulk lookups may still exceed the limit.
 

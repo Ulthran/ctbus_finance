@@ -51,7 +51,7 @@ def main():
         )
         ingest_csv_parser.add_argument(
             "type",
-            help="Type of the CSV file (e.g., accounts, holdings, account_holdings).",
+            help="Type of the CSV file (e.g., accounts, holdings, account_holdings, capitalone_transactions).",
         )
         ingest_csv_parser.add_argument(
             "--date",
@@ -75,6 +75,7 @@ def main():
             "account_holdings",
             "credit_cards",
             "credit_card_holdings",
+            "capitalone_transactions",
         ]:
             sys.stderr.write(f"Type {ingest_csv_args.type} is not recognized.\n")
             sys.exit(1)

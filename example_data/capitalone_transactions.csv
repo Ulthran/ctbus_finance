@@ -1,0 +1,5 @@
+Transaction Date,Posted Date,Account,Description,Category,Debit,Credit
+2024-01-01,2024-01-02,Bank,Coffee,Food and Drink,5,
+2024-01-02,2024-01-03,Bank,Salary,Income,,1000
+2024-01-03,2024-01-04,Card,Grocery,Groceries,50,
+2024-01-04,2024-01-05,Card,Refund,Groceries,,20
