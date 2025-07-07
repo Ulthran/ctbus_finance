@@ -6,7 +6,7 @@ dependencies = [
     "morningstar-data==1.11.0",
     "pandas==2.3.0",
     "SQLAlchemy==2.0.41",
-    "yfinance==0.2.63",
+    "yfinance==0.2.65",
     "Flask==3.1.1",
 ]
 requires-python = ">=3.8"
