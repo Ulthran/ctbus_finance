@@ -1,13 +1,9 @@
 [project]
 name = "ctbus_finance"
-description = "A Python library for defining and interacting with a personal finance database."
+description = "A Python library for parsing finance PDF statements."
 dynamic = ["version"]
 dependencies = [
-    "morningstar-data==1.11.0",
-    "pandas==2.3.0",
-    "SQLAlchemy==2.0.41",
-    "yfinance==0.2.63",
-    "Flask==3.1.1",
+    "PyPDF2==3.0.1",
 ]
 requires-python = ">=3.8"
 
@@ -27,8 +23,3 @@ version = {attr = "ctbus_finance.__version__"}
 
 [tool.setuptools.packages.find]
 include = ["ctbus_finance*"]
-exclude = ["alembic*"]
-
-[project.scripts]
-ctbus_finance = "ctbus_finance.cli:main"
-ctbus_finance_web = "ctbus_finance.flask_app:main"
