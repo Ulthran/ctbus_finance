@@ -4,6 +4,7 @@ __version__ = "0.1.0"
 
 from .reports import (
     Report,
+    MonthReports,
     HSAReport,
     Four03bReport,
     RothIRAReport,
@@ -29,6 +30,7 @@ from .reports import (
 
 __all__ = [
     "Report",
+    "MonthReports",
     "HSAReport",
     "Four03bReport",
     "RothIRAReport",
