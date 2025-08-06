@@ -1,6 +1,5 @@
 from __future__ import annotations
 
-from datetime import date
 from pathlib import Path
 from typing import Iterable
 
@@ -26,9 +25,16 @@ class Report:
 
 
 class MonthReports:
-    """Collection of reports for a specific month."""
+    """Collection of reports for a specific month.
 
-    def __init__(self, month: date, reports: Iterable[Report] | None = None) -> None:
+    Args:
+        month: Integer month index (1-12).
+        reports: Optional iterable of reports to initialize the collection.
+    """
+
+    def __init__(self, month: int, reports: Iterable[Report] | None = None) -> None:
+        if not 1 <= month <= 12:
+            raise ValueError("month must be in 1..12")
         self.month = month
         self._reports = list(reports) if reports else []
 

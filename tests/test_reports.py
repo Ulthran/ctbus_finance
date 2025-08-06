@@ -1,4 +1,3 @@
-from datetime import date
 from pathlib import Path
 import sys
 
@@ -117,7 +116,7 @@ def test_month_reports_aggregate(tmp_path):
         def net_value(self) -> float:
             return self._value
 
-    january = MonthReports(date(2024, 1, 1))
+    january = MonthReports(1)
     january.add(DummyReport(10))
     january.add(DummyReport(15))
 
