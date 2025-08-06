@@ -9,9 +9,27 @@ sys.path.insert(0, str(ROOT))
 
 from ctbus_finance import (
     Report,
-    FidelityReport,
-    VanguardReport,
-    CapitalOneReport,
+    HSAReport,
+    Four03bReport,
+    RothIRAReport,
+    BrokerageReport,
+    CheckingReport,
+    SavingsReport,
+    CreditCardReport,
+    CryptoWalletReport,
+    CashReport,
+    DigitalWalletReport,
+    HealthEquityHSAReport,
+    TIAA403bReport,
+    VanguardRothIRAReport,
+    VanguardBrokerageReport,
+    FidelityBrokerageReport,
+    CapitalOneCheckingReport,
+    CapitalOneSavingsReport,
+    CapitalOneCreditCardReport,
+    CoinbaseCryptoWalletReport,
+    WalletCashReport,
+    VenmoDigitalWalletReport,
 )
 
 
@@ -25,10 +43,38 @@ def create_blank_pdf(path: Path) -> None:
 def test_parse_blank(tmp_path):
     pdf = tmp_path / "blank.pdf"
     create_blank_pdf(pdf)
-    report = FidelityReport(pdf)
+    report = VenmoDigitalWalletReport(pdf)
     assert report.parse() == ""
 
 
 def test_subclasses():
-    for cls in (FidelityReport, VanguardReport, CapitalOneReport):
+    account_classes = [
+        HSAReport,
+        Four03bReport,
+        RothIRAReport,
+        BrokerageReport,
+        CheckingReport,
+        SavingsReport,
+        CreditCardReport,
+        CryptoWalletReport,
+        CashReport,
+        DigitalWalletReport,
+    ]
+    for cls in account_classes:
         assert issubclass(cls, Report)
+
+    platform_map = {
+        HealthEquityHSAReport: HSAReport,
+        TIAA403bReport: Four03bReport,
+        VanguardRothIRAReport: RothIRAReport,
+        VanguardBrokerageReport: BrokerageReport,
+        FidelityBrokerageReport: BrokerageReport,
+        CapitalOneCheckingReport: CheckingReport,
+        CapitalOneSavingsReport: SavingsReport,
+        CapitalOneCreditCardReport: CreditCardReport,
+        CoinbaseCryptoWalletReport: CryptoWalletReport,
+        WalletCashReport: CashReport,
+        VenmoDigitalWalletReport: DigitalWalletReport,
+    }
+    for subclass, parent in platform_map.items():
+        assert issubclass(subclass, parent)
