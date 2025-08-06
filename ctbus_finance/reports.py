@@ -18,6 +18,40 @@ class Report:
         texts: Iterable[str] = (page.extract_text() or "" for page in reader.pages)
         return "\n".join(texts).strip()
 
+    @property
+    def net_value(self) -> float:
+        """Net monetary value represented by this report."""
+        return 0.0
+
+
+class MonthReports:
+    """Collection of reports for a specific month.
+
+    Args:
+        month: Integer month index (1-12).
+        reports: Optional iterable of reports to initialize the collection.
+    """
+
+    def __init__(self, month: int, reports: Iterable[Report] | None = None) -> None:
+        if not 1 <= month <= 12:
+            raise ValueError("month must be in 1..12")
+        self.month = month
+        self._reports = list(reports) if reports else []
+
+    def add(self, report: Report) -> None:
+        """Add a report to the collection."""
+        self._reports.append(report)
+
+    @property
+    def reports(self) -> list[Report]:
+        """Return the list of stored reports."""
+        return list(self._reports)
+
+    @property
+    def net_value(self) -> float:
+        """Aggregate net value of all contained reports."""
+        return sum(r.net_value for r in self._reports)
+
 
 class HSAReport(Report):
     """Base class for HSA account statements."""

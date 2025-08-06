@@ -9,6 +9,7 @@ sys.path.insert(0, str(ROOT))
 
 from ctbus_finance import (
     Report,
+    MonthReports,
     HSAReport,
     Four03bReport,
     RothIRAReport,
@@ -78,3 +79,45 @@ def test_subclasses():
     }
     for subclass, parent in platform_map.items():
         assert issubclass(subclass, parent)
+
+
+def test_net_value_property(tmp_path):
+    pdf = tmp_path / "blank.pdf"
+    create_blank_pdf(pdf)
+
+    account_classes = [
+        HSAReport,
+        Four03bReport,
+        RothIRAReport,
+        BrokerageReport,
+        CheckingReport,
+        SavingsReport,
+        CreditCardReport,
+        CryptoWalletReport,
+        CashReport,
+        DigitalWalletReport,
+    ]
+
+    for cls in account_classes:
+        report = cls(pdf)
+        assert isinstance(report.net_value, (int, float))
+
+
+def test_month_reports_aggregate(tmp_path):
+    pdf = tmp_path / "blank.pdf"
+    create_blank_pdf(pdf)
+
+    class DummyReport(Report):
+        def __init__(self, value: float) -> None:
+            super().__init__(pdf)
+            self._value = value
+
+        @property
+        def net_value(self) -> float:
+            return self._value
+
+    january = MonthReports(1)
+    january.add(DummyReport(10))
+    january.add(DummyReport(15))
+
+    assert january.net_value == 25
