@@ -3,6 +3,7 @@ alembic.ini
 alembic/
 data/
 db.sqlite
+reports/
 
 # Byte-compiled / optimized / DLL files
 __pycache__/

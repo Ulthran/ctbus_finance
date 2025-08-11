@@ -5,13 +5,12 @@ dynamic = ["version"]
 dependencies = [
     "PyPDF2==3.0.1",
 ]
-requires-python = ">=3.8"
+requires-python = ">=3.9"
 
 [project.optional-dependencies]
 dev = [
     "black",
     "pytest",
-    "pytest-cov",
 ]
 
 [build-system]
