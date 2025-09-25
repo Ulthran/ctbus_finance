@@ -1,9 +1,9 @@
 [project]
 name = "ctbus_finance"
-description = "A Python library for parsing finance PDF statements."
+description = "Importers that convert financial statements into Beancount entries."
 dynamic = ["version"]
 dependencies = [
-    "PyPDF2==3.0.1",
+    "beancount>=3.2.0",
 ]
 requires-python = ">=3.9"
 
