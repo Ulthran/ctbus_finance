@@ -1,19 +1,39 @@
 # ctbus_finance
 
-A lightweight library for parsing monthly PDF statements from various financial
-institutions.  Each provider has its own report subclass for applying provider
-specific parsing logic.
+Tools for importing real-world financial statements into [Beancount](https://beancount.github.io/) and exploring them with [Fava](https://beancount.github.io/fava/).
 
-## Usage
+## Capital One credit card importer
+
+This project re-exports the `CreditImporter` from [mtlynch/beancount-capitalone](https://github.com/mtlynch/beancount-capitalone) so it can be used from the `ctbus_finance` namespace.
 
 ```python
-from ctbus_finance import FidelityReport
+from ctbus_finance import CapitalOneCreditCardImporter
 
-report = FidelityReport("statement.pdf")
-text = report.parse()
-print(text)
+importer = CapitalOneCreditCardImporter(
+    account="Liabilities:CreditCard:CapitalOne",
+    lastfour="1234",
+    account_patterns=[
+        (r"coffee", "Expenses:Food:Coffee"),
+        (r"train", "Expenses:Transport:Transit"),
+    ],
+)
+
+entries = importer.extract(open("~/Downloads/CapitalOne2024.csv"))
+for entry in entries:
+    print(entry)
 ```
 
-The base :class:`Report` extracts text from the PDF using ``PyPDF2``.  The
-provider specific subclasses are simple wrappers that can be extended with
-custom parsing logic as needed.
+The importer reads CSV exports generated from Capital One credit card statements and produces Beancount transactions with per-payee account mapping support.
+
+## Launching the Fava web UI
+
+You can also launch the Fava web interface directly from Python using the provided helper:
+
+```python
+from ctbus_finance import launch_fava
+
+# This will block while Fava is running.
+launch_fava("~/Documents/finance.beancount", host="0.0.0.0", port=5000)
+```
+
+Pass ``open_browser=False`` to skip opening a browser window automatically, or supply additional CLI flags via ``extra_args``.
