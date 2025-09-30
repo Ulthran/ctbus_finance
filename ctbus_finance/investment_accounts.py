@@ -18,9 +18,16 @@ def get_investment_accounts(accts: list[Path]):
     return sorted(investment_accounts)
 
 
+def get_currency(acct: str) -> str:
+    s = acct.split(":")[-1]
+    if s == "Cash":
+        return "USD"
+    return s
+
+
 def investment_accounts_str(accts: list[Path]):
     return "\n".join(
-        [f"2020-01-01 open {account} USD" for account in get_investment_accounts(accts)]
+        [f"2020-01-01 open {account} {get_currency(account)}" for account in get_investment_accounts(accts)]
     )
 
 

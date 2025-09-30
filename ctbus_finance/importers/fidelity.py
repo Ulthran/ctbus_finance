@@ -33,6 +33,7 @@ class Importer(importer.ImporterProtocol):
         account_nos: dict[str, str],
         currency: str = "USD",
         account_patterns=None,
+        cusip_map: dict[str, str] = None,
     ):
         self._account = account
         self._account_nos = account_nos
@@ -43,9 +44,26 @@ class Importer(importer.ImporterProtocol):
                 self._account_patterns.append(
                     (re.compile(pattern, flags=re.IGNORECASE), account_name)
                 )
+        self._cusip_map = cusip_map if cusip_map else {}
+
+    # ----------------------------
+    # Quantizers
+    # ----------------------------
+    def _quantize_cash(self, value):
+        """Quantize to 2 decimals for USD cash amounts."""
+        return value.quantize(beancount_number.D("0.01"))
+
+    def _quantize_qty(self, value):
+        """Quantize to 6 decimals for share quantities."""
+        return value.quantize(beancount_number.D("0.000001"))
+
+    def _quantize_cost(self, value):
+        """Quantize to 6 decimals for per-share cost basis."""
+        return value.quantize(beancount_number.D("0.000001"))
 
     def _parse_amount(self, amount_raw):
-        return amount.Amount(beancount_number.D(amount_raw), self._currency)
+        num = beancount_number.D(amount_raw)
+        return amount.Amount(self._quantize_cash(num), self._currency)
 
     def file_date(self, file):
         return max(map(lambda x: x.date, self.extract(file)))
@@ -92,7 +110,7 @@ class Importer(importer.ImporterProtocol):
         action = row[_COLUMN_ACTION].strip().upper()
         narration = titlecase.titlecase(row[_COLUMN_DESCRIPTION] or row[_COLUMN_ACTION])
 
-        # Normalize amount
+        # Normalize amount (always quantized to cents)
         raw_amt = row[_COLUMN_AMOUNT].replace("$", "").replace(",", "").strip()
         if not raw_amt:
             return None
@@ -105,6 +123,15 @@ class Importer(importer.ImporterProtocol):
         account = self._account_nos.get(account_no, self._account)
 
         symbol = row[_COLUMN_SYMBOL].strip()
+
+        # If Symbol looks numeric (CUSIP), map it to a proper ticker
+        if symbol in self._cusip_map:
+            clean_symbol = self._cusip_map[symbol]
+        else:
+            # fallback: ensure it’s at least 2 characters and all caps
+            clean_symbol = re.sub(r"\W+", "", symbol).upper()
+            if len(clean_symbol) == 1:
+                clean_symbol = f"TICKER-{clean_symbol}"
 
         postings = []
 
@@ -120,7 +147,7 @@ class Importer(importer.ImporterProtocol):
                     meta=None,
                 ),
                 data.Posting(
-                    account=f"Income:Dividends:{symbol}",
+                    account=f"Income:Dividends:{clean_symbol}",
                     units=-transaction_amount,
                     cost=None,
                     price=None,
@@ -131,6 +158,7 @@ class Importer(importer.ImporterProtocol):
 
         # --- Case 2: Deposit ---
         elif "CHECK RECEIVED" in action:
+            account_from = symbol if symbol else "TODO"
             postings = [
                 data.Posting(
                     account=account + ":Cash",
@@ -141,7 +169,7 @@ class Importer(importer.ImporterProtocol):
                     meta=None,
                 ),
                 data.Posting(
-                    account="TODO",  # figure out source account
+                    account=account_from,
                     units=-transaction_amount,
                     cost=None,
                     price=None,
@@ -152,6 +180,7 @@ class Importer(importer.ImporterProtocol):
 
         # --- Case 3: Transfer ---
         elif "TRANSFERRED FROM" in action:
+            account_from = symbol if symbol else "TODO"
             postings = [
                 data.Posting(
                     account=account + ":Cash",
@@ -162,7 +191,7 @@ class Importer(importer.ImporterProtocol):
                     meta=None,
                 ),
                 data.Posting(
-                    account="TODO",  # figure out source account
+                    account=account_from,
                     units=-transaction_amount,
                     cost=None,
                     price=None,
@@ -173,17 +202,17 @@ class Importer(importer.ImporterProtocol):
 
         # --- Case 4: Buy/Sell ---
         elif "BOUGHT" in action:
-            symbol = row[_COLUMN_SYMBOL].strip()
-            qty = beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
-            cost_number = (transaction_amount.number / qty).quantize(
-                beancount_number.D("0.0001")
+            qty = self._quantize_qty(
+                beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
             )
+            total_cost = -transaction_amount.number
+            cost_number = self._quantize_cost(total_cost / qty)
             cost = position.Cost(cost_number, self._currency, None, None)
 
             postings = [
                 data.Posting(
-                    account=account + ":" + symbol,
-                    units=amount.Amount(qty, symbol),
+                    account=account + ":" + clean_symbol,
+                    units=amount.Amount(qty, clean_symbol),
                     cost=cost,
                     price=None,
                     flag=None,
@@ -191,7 +220,7 @@ class Importer(importer.ImporterProtocol):
                 ),
                 data.Posting(
                     account=account + ":Cash",
-                    units=-transaction_amount,
+                    units=transaction_amount,  # already quantized
                     cost=None,
                     price=None,
                     flag=None,
@@ -200,21 +229,22 @@ class Importer(importer.ImporterProtocol):
             ]
 
         elif "SOLD" in action:
-            symbol = row[_COLUMN_SYMBOL].strip()
-            qty = beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
+            qty = self._quantize_qty(
+                beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
+            )
 
             postings = [
                 data.Posting(
                     account=account + ":Cash",
-                    units=transaction_amount,
+                    units=transaction_amount,  # inflow, quantized
                     cost=None,
                     price=None,
                     flag=None,
                     meta=None,
                 ),
                 data.Posting(
-                    account=account + ":" + symbol,
-                    units=amount.Amount(-qty, symbol),
+                    account=account + ":" + clean_symbol,
+                    units=amount.Amount(qty, clean_symbol),
                     cost=None,
                     price=None,
                     flag=None,
@@ -222,7 +252,7 @@ class Importer(importer.ImporterProtocol):
                 ),
                 data.Posting(
                     account="Income:CapitalGains",
-                    units=-transaction_amount,  # placeholder, refine later
+                    units=None,
                     cost=None,
                     price=None,
                     flag=None,
@@ -230,8 +260,50 @@ class Importer(importer.ImporterProtocol):
                 ),
             ]
 
+        # --- Case 5: Merger ---
+        elif "MERGER" in action:
+            qty_raw = row[_COLUMN_QUANTITY].replace(",", "").strip()
+            qty = self._quantize_qty(beancount_number.D(qty_raw)) if qty_raw else None
+
+            postings = []
+
+            if transaction_amount.number != 0 and clean_symbol.upper() == "CASH":
+                postings.append(
+                    data.Posting(
+                        account=account + ":Cash",
+                        units=transaction_amount,
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None,
+                    )
+                )
+                postings.append(
+                    data.Posting(
+                        account="Income:CorporateActions",
+                        units=-transaction_amount,
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None,
+                    )
+                )
+
+            elif qty and qty != 0:
+                postings.append(
+                    data.Posting(
+                        account=account + ":" + clean_symbol,
+                        units=amount.Amount(qty, clean_symbol),
+                        cost=None,
+                        price=None,
+                        flag=None,
+                        meta=None,
+                    )
+                )
+
+            metadata["fidelity_action"] = row[_COLUMN_DESCRIPTION]
+
         else:
-            # Skip unknown types for now
             return None
 
         return data.Transaction(

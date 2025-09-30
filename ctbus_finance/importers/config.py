@@ -411,7 +411,7 @@ checking_account_patterns = [
     ("Givedirectly", "Expenses:Charity:GiveDirectly"),
     ("UNIVERSITY OF PE", "Income:Expenses:UPenn"),
     ("O'BRIEN'S GENERA", "Expenses:Shopping:Groceries:OBriens-General-Store"),
-    ("COINBASE", "Assets:Investments:Crypto:Coinbase"),
+    ("COINBASE", "Assets:Investments:Crypto:Coinbase:USDC"),
     ("JIFFY MART", "Expenses:Travel:Fuel:Jiffy-Mart"),
     ("Check", "Expenses:Rent"),
     ("BROADWAY GAS", "Expenses:Travel:Fuel:Broadway-Gas"),
@@ -425,7 +425,7 @@ savings_account_patterns = [
     ("TRUSTEES OF UNIV PAYROLL", "Income:Salary:UPenn"),
     ("Monthly Interest Paid", "Income:Interest:CapitalOne"),
     ("CAPITAL ONE CRCARDPMT", "Liabilities:Credit-Cards:CapitalOne"),
-    ("VANGUARD BUY", "Assets:Investments:Vanguard:Roth-IRA"),
+    ("VANGUARD BUY", "Assets:Investments:Vanguard:Roth-IRA:Cash"),
     ("IRS USATAXPYMT", "Income:Taxes:Federal"),
     ("COMM OF MASS EFT", "Income:Taxes:MA"),
     ("MA Tax Refund", "Income:Taxes:MA"),
@@ -489,6 +489,12 @@ CONFIG = [
         account_nos={
             "X94909428": "Assets:Investments:Fidelity:Brokerage",
             "Y81595674": "Assets:Investments:Fidelity:Large-Cap",
+        },
+        cusip_map={
+            "03662Q105": 'ANSS',
+            "254709108": 'DFS',
+            "42809H107": 'HES',
+            "931427108": 'WBA',
         },
     ),
 ]
