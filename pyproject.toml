@@ -4,6 +4,7 @@ description = "Importers that convert financial statements into Beancount entrie
 dynamic = ["version"]
 dependencies = [
     "beancount~=3.2",
+    "beangulp~=0.2",
     "fava~=1.26",
     "titlecase~=2.4",
 ]
