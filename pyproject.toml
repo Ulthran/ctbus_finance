@@ -3,7 +3,7 @@ name = "ctbus_finance"
 description = "Importers that convert financial statements into Beancount entries."
 dynamic = ["version"]
 dependencies = [
-    "beancount>=2.3.5,<3",
+    "beancount>=2.3.5,<4",
     "fava>=1.26.0",
     "titlecase>=2.4.0",
 ]
