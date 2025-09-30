@@ -3,7 +3,7 @@ import datetime
 import re
 import titlecase
 from beancount.core import amount, data, flags, number as beancount_number, position
-from beancount.ingest import importer
+from beangulp import importer
 
 
 _COLUMN_DATE = "Run Date"
