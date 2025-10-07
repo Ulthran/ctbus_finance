@@ -1,12 +1,23 @@
 import subprocess as sp
-from ctbus_finance.dividend_accounts import dividend_accounts_str
-from ctbus_finance.expense_accounts import expense_accounts_str
-from ctbus_finance.investment_accounts import investment_accounts_str
+from beancount.core import data
+from beancount.loader import load_file
+from beancount.parser import printer
+from beangulp.extract import extract_from_file
+from beangulp.identify import identify
+from ctbus_finance.account_extract import accounts_str, get_commodities
+from ctbus_finance.importers.config import CONFIG
+from ctbus_finance.reconcile import reconcile_transaction
+from ctbus_finance.starting_balances import starting_balances
+from datetime import datetime
 from pathlib import Path
 
 
 if __name__ == "__main__":
-    for fp in Path("/home/ctbus/ctbus_finance/logs").glob("*.log"):
+    logs_dir = Path("/home/ctbus/ctbus_finance/logs")
+    logs_dir.mkdir(exist_ok=True)
+
+    # Clean old logs
+    for fp in logs_dir.glob("*.log"):
         fp.unlink()
 
     csvs = list(Path("/home/ctbus/ctbus_finance/csv/").glob("*.csv"))
@@ -14,47 +25,59 @@ if __name__ == "__main__":
         Path("/home/ctbus/ctbus_finance/beancount") / (csv.stem + ".beancount")
         for csv in csvs
     ]
+    transactions_fp = Path("/home/ctbus/ctbus_finance/beancount/transactions.beancount")
+    manual_fp = Path("/home/ctbus/ctbus_finance/beancount/manual.beancount")
+
+    # Import CSVs
+    txns: data.Directives = starting_balances()
     for csv, beancount in zip(csvs, beancounts):
+        try:
+            
+            importer = identify(CONFIG, str(csv))
+
+            if not importer:
+                print(f"No importer found for {csv}")
+                continue
+
+            entries = extract_from_file(importer, str(csv), [])
+            txns.extend(entries)
+        except Exception as e:
+            # Log errors per file
+            print(f"Error processing {csv}: {e}")
+            raise
+
+    # Reconcile TODOs
+    txns = [reconcile_transaction(txn, i, txns) for i, txn in enumerate(txns)]
+    with open(transactions_fp, "w") as f:
+        for entry in sorted(txns, key=lambda x: x.date):
+            f.write(printer.format_entry(entry))
+            f.write("\n")  # add a blank line between entries
+
+    # Generate account file
+    with open(
+        "/home/ctbus/ctbus_finance/beancount/accounts.beancount", "w"
+    ) as f:
+        f.write(accounts_str([transactions_fp, manual_fp]))
+
+    # Generate commodities file
+    commodities = get_commodities([transactions_fp, manual_fp])
+    with open(
+        "/home/ctbus/ctbus_finance/beancount/commodities.beancount", "w"
+    ) as f:
+        for commodity in commodities:
+            f.write(printer.format_entry(commodity))
+
+    if True:
+    # Generate prices file
+        prices_fp = Path(f"/home/ctbus/ctbus_finance/beancount/prices/{datetime.now().strftime('%Y_%m_%d')}.beancount")
+        prices_fp.unlink(missing_ok=True)
+
         result = sp.run(
-            [
-                "bean-extract",
-                "/home/ctbus/ctbus_finance/ctbus_finance/importers/config.py",
-                str(csv),
-            ],
-            capture_output=True,
+            ["bean-price", "/home/ctbus/ctbus_finance/all.beancount", "-w", "8"],
+            stdout=sp.PIPE,
+            stderr=sp.PIPE,
             text=True,
         )
-        with open(beancount, "w") as f:
+        print(f"bean-price: {result.stderr}")
+        with open(prices_fp, "w") as f:
             f.write(result.stdout)
-        if result.stderr:
-            with open(
-                f"/home/ctbus/ctbus_finance/logs/{csv.stem}.log", "w"
-            ) as log_file:
-                log_file.write(result.stderr)
-
-    with open(
-        "/home/ctbus/ctbus_finance/beancount/expense_accounts.beancount", "w"
-    ) as f:
-        f.write(expense_accounts_str(beancounts))
-
-    with open(
-        "/home/ctbus/ctbus_finance/beancount/dividend_accounts.beancount", "w"
-    ) as f:
-        f.write(dividend_accounts_str(beancounts))
-
-    with open(
-        "/home/ctbus/ctbus_finance/beancount/investment_accounts.beancount", "w"
-    ) as f:
-        f.write(investment_accounts_str(beancounts))
-
-    result = sp.run(
-        ["bean-check", "/home/ctbus/ctbus_finance/all.beancount"],
-        capture_output=True,
-        text=True,
-    )
-    with open("/home/ctbus/ctbus_finance/check.txt", "w") as f:
-        f.write(result.stderr)
-    with open("/home/ctbus/ctbus_finance/check.txt") as f:
-        num_issues = len(f.readlines()) / 4
-    if num_issues > 0:
-        print(f"Found {num_issues} issues in check.txt")

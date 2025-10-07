@@ -4,6 +4,7 @@ import re
 import titlecase
 from beancount.core import amount, data, flags, number as beancount_number, position
 from beangulp import importer
+from ctbus_finance.importers.stock_action import BuyAction, CheckReceivedAction, DividendAction, DistributionAction, FeeAction, ForeignTaxAction, MergerAction, SellAction, StockAction, TransferAction
 
 
 _COLUMN_DATE = "Run Date"
@@ -33,7 +34,7 @@ class Importer(importer.ImporterProtocol):
         account_nos: dict[str, str],
         currency: str = "USD",
         account_patterns=None,
-        cusip_map: dict[str, str] = None,
+        cusip_map: dict[str, str] = {},
     ):
         self._account = account
         self._account_nos = account_nos
@@ -44,7 +45,8 @@ class Importer(importer.ImporterProtocol):
                 self._account_patterns.append(
                     (re.compile(pattern, flags=re.IGNORECASE), account_name)
                 )
-        self._cusip_map = cusip_map if cusip_map else {}
+        self._cusip_map = cusip_map
+
 
     # ----------------------------
     # Quantizers
@@ -68,32 +70,41 @@ class Importer(importer.ImporterProtocol):
     def file_date(self, file):
         return max(map(lambda x: x.date, self.extract(file)))
 
-    def file_account(self, _):
+    def file_account(self, file: str) -> str:
         return self._account
+    
+    def identify(self, file: str) -> bool:
+        try:
+            with open(file, encoding="utf-8") as csv_file:
+                # Skip first 2 lines before header
+                next(csv_file)
+                next(csv_file)
+                for row in csv.DictReader(csv_file):
+                    return (
+                        str(row[_COLUMN_ACCOUNT_NO]).strip('"') in self._account_nos.keys()
+                    )
+        except Exception as e:
+            pass
+        return False
 
-    def identify(self, file):
-        with open(file.name, encoding="utf-8") as csv_file:
-            # Skip first 2 lines before header
-            next(csv_file)
-            next(csv_file)
-            for row in csv.DictReader(csv_file):
-                return (
-                    str(row[_COLUMN_ACCOUNT_NO]).strip('"') in self._account_nos.keys()
-                )
+    def sort(self, entries: data.Directives, reverse: bool = False) -> None:
+        pass
 
-    def extract(self, f):
+    def extract(self, file: str, existing_entries: list[data.Directive] = []) -> list[data.Directive]:
         transactions = []
 
-        with open(f.name, encoding="utf-8") as csv_file:
+        with open(file, encoding="utf-8") as csv_file:
             # Skip first 2 lines before header
             next(csv_file)
             next(csv_file)
             for index, row in enumerate(csv.DictReader(csv_file)):
-                metadata = data.new_metadata(f.name, index)
+                metadata = data.new_metadata(file, index)
                 transaction = self._extract_transaction_from_row(row, metadata)
                 if not transaction:
                     continue
                 transactions.append(transaction)
+
+        transactions = self._consolidate_merger_transactions(transactions)
 
         return transactions
 
@@ -101,12 +112,8 @@ class Importer(importer.ImporterProtocol):
         # Stop if this is a disclaimer row (no date, no account, etc.)
         if not row[_COLUMN_DATE] or not row[_COLUMN_ACCOUNT_NO]:
             return None
-
-        # Parse date
-        transaction_date = datetime.datetime.strptime(
-            row[_COLUMN_DATE], "%m/%d/%Y"
-        ).date()
-
+        
+        transaction_date = datetime.datetime.strptime(row[_COLUMN_DATE], "%m/%d/%Y")
         action = row[_COLUMN_ACTION].strip().upper()
         narration = titlecase.titlecase(row[_COLUMN_DESCRIPTION] or row[_COLUMN_ACTION])
 
@@ -115,9 +122,6 @@ class Importer(importer.ImporterProtocol):
         if not raw_amt:
             return None
         transaction_amount = self._parse_amount(raw_amt)
-
-        if transaction_amount.number == 0:
-            return None
 
         account_no = str(row[_COLUMN_ACCOUNT_NO]).strip('"')
         account = self._account_nos.get(account_no, self._account)
@@ -133,182 +137,71 @@ class Importer(importer.ImporterProtocol):
             if len(clean_symbol) == 1:
                 clean_symbol = f"TICKER-{clean_symbol}"
 
-        postings = []
-
-        # --- Case 1: Dividend ---
-        if "DIVIDEND RECEIVED" in action:
-            postings = [
-                data.Posting(
-                    account=account + ":Cash",
-                    units=transaction_amount,
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-                data.Posting(
-                    account=f"Income:Dividends:{clean_symbol}",
-                    units=-transaction_amount,
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-            ]
-
-        # --- Case 2: Deposit ---
-        elif "CHECK RECEIVED" in action:
-            account_from = symbol if symbol else "TODO"
-            postings = [
-                data.Posting(
-                    account=account + ":Cash",
-                    units=transaction_amount,
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-                data.Posting(
-                    account=account_from,
-                    units=-transaction_amount,
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-            ]
-
-        # --- Case 3: Transfer ---
-        elif "TRANSFERRED FROM" in action:
-            account_from = symbol if symbol else "TODO"
-            postings = [
-                data.Posting(
-                    account=account + ":Cash",
-                    units=transaction_amount,
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-                data.Posting(
-                    account=account_from,
-                    units=-transaction_amount,
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-            ]
-
-        # --- Case 4: Buy/Sell ---
-        elif "BOUGHT" in action:
-            qty = self._quantize_qty(
-                beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
-            )
-            total_cost = -transaction_amount.number
-            cost_number = self._quantize_cost(total_cost / qty)
-            cost = position.Cost(cost_number, self._currency, None, None)
-
-            postings = [
-                data.Posting(
-                    account=account + ":" + clean_symbol,
-                    units=amount.Amount(qty, clean_symbol),
-                    cost=cost,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-                data.Posting(
-                    account=account + ":Cash",
-                    units=transaction_amount,  # already quantized
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-            ]
-
+        if "BOUGHT" in action:
+            action_type = BuyAction
+            symbol = clean_symbol
         elif "SOLD" in action:
-            qty = self._quantize_qty(
-                beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
-            )
-
-            postings = [
-                data.Posting(
-                    account=account + ":Cash",
-                    units=transaction_amount,  # inflow, quantized
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-                data.Posting(
-                    account=account + ":" + clean_symbol,
-                    units=amount.Amount(qty, clean_symbol),
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-                data.Posting(
-                    account="Income:CapitalGains",
-                    units=None,
-                    cost=None,
-                    price=None,
-                    flag=None,
-                    meta=None,
-                ),
-            ]
-
-        # --- Case 5: Merger ---
+            action_type = SellAction
+            symbol = clean_symbol
+        elif "DIVIDEND RECEIVED" in action:
+            action_type = DividendAction
+            symbol = clean_symbol
+        elif "CHECK RECEIVED" in action:
+            action_type = CheckReceivedAction
+        elif "TRANSFERRED FROM" in action:
+            action_type = TransferAction
+        elif "TRANSFERRED TO" in action:
+            return None # Handled by other side of transfer
         elif "MERGER" in action:
-            qty_raw = row[_COLUMN_QUANTITY].replace(",", "").strip()
-            qty = self._quantize_qty(beancount_number.D(qty_raw)) if qty_raw else None
-
-            postings = []
-
-            if transaction_amount.number != 0 and clean_symbol.upper() == "CASH":
-                postings.append(
-                    data.Posting(
-                        account=account + ":Cash",
-                        units=transaction_amount,
-                        cost=None,
-                        price=None,
-                        flag=None,
-                        meta=None,
-                    )
-                )
-                postings.append(
-                    data.Posting(
-                        account="Income:CorporateActions",
-                        units=-transaction_amount,
-                        cost=None,
-                        price=None,
-                        flag=None,
-                        meta=None,
-                    )
-                )
-
-            elif qty and qty != 0:
-                postings.append(
-                    data.Posting(
-                        account=account + ":" + clean_symbol,
-                        units=amount.Amount(qty, clean_symbol),
-                        cost=None,
-                        price=None,
-                        flag=None,
-                        meta=None,
-                    )
-                )
-
+            action_type = MergerAction
+            symbol = clean_symbol
             metadata["fidelity_action"] = row[_COLUMN_DESCRIPTION]
-
+            metadata["fidelity_action_type"] = "MERGER"
+        elif "DISTRIBUTION" in action:
+            action_type = DistributionAction
+            symbol = clean_symbol
+            metadata["fidelity_action"] = row[_COLUMN_DESCRIPTION]
+            metadata["todo"] = "Attach cost basis (same as original purchase)"
+            metadata["todo_type"] = "DISTRIBUTION"
+        elif "FOREIGN TAX PAID" in action:
+            action_type = ForeignTaxAction
+            symbol = clean_symbol
+        elif "ADVISORY FEE" in action:
+            action_type = FeeAction
+            symbol = clean_symbol
+        elif "LONG-TERM CAP GAIN" in action:
+            action_type = DistributionAction
+            symbol = clean_symbol
+            metadata["fidelity_action"] = row[_COLUMN_DESCRIPTION]
+        elif "FEE CHARGED" in action:
+            action_type = FeeAction
+            symbol = clean_symbol
+        elif "IN LIEU OF FRX SHARE" in action:
+            action_type = DistributionAction
+            symbol = clean_symbol
+            metadata["fidelity_action"] = row[_COLUMN_DESCRIPTION]
         else:
+            print("Unhandled action:", action)
             return None
+
+        action = action_type(
+            date=transaction_date,
+            account=account,
+            symbol=symbol,
+            quantity=self._quantize_qty(
+                beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
+            ) if row[_COLUMN_QUANTITY] else beancount_number.D("0.000000"),
+            currency=self._currency,
+            price=self._quantize_cash(beancount_number.D(row[_COLUMN_PRICE].replace(",", ""))),
+            fees=self._quantize_cash(beancount_number.D(row[_COLUMN_FEES].replace(",", ""))) if row[_COLUMN_FEES] else beancount_number.D("0.00"),
+            amount=self._quantize_cost(beancount_number.D(row[_COLUMN_AMOUNT].replace(",", ""))),
+            transaction_type=row[_COLUMN_TYPE].strip().upper(),
+        )
+        postings = action.get_postings()
 
         return data.Transaction(
             meta=metadata,
-            date=transaction_date,
+            date=transaction_date.date(),
             flag=flags.FLAG_OKAY,
             payee=None,
             narration=narration,
@@ -316,3 +209,46 @@ class Importer(importer.ImporterProtocol):
             links=data.EMPTY_SET,
             postings=postings,
         )
+    
+    def _consolidate_merger_transactions(self, transactions: list[data.Transaction]) -> list[data.Directive]:
+        consolidated = []
+        skip_next = False
+
+        for i in range(len(transactions)):
+            if skip_next:
+                skip_next = False
+                continue
+
+            current = transactions[i]
+
+            if (
+                i < len(transactions) - 1
+                and isinstance(current, data.Transaction)
+                and isinstance(transactions[i + 1], data.Transaction)
+                and "MERGER" == current.meta.get("fidelity_action_type", "")
+                and "MERGER" == transactions[i + 1].meta.get("fidelity_action_type", "")
+                and current.date == transactions[i + 1].date
+            ):
+                next_txn = transactions[i + 1]
+                # Merge postings from both transactions
+                merged_postings = current.postings + next_txn.postings
+                merged_narration = f"{current.narration} / {next_txn.narration}"
+                merged_metadata = {**current.meta, **next_txn.meta}
+
+                consolidated.append(
+                    data.Transaction(
+                        meta=merged_metadata,
+                        date=current.date,
+                        flag=current.flag,
+                        payee=None,
+                        narration=merged_narration,
+                        tags=data.EMPTY_SET,
+                        links=data.EMPTY_SET,
+                        postings=merged_postings,
+                    )
+                )
+                skip_next = True
+            else:
+                consolidated.append(current)
+
+        return consolidated

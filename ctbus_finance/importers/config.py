@@ -5,6 +5,9 @@ from ctbus_finance.importers.capitalone_deposit_account import (
     Importer as CapitalOneDepositAccountImporter,
 )
 from ctbus_finance.importers.fidelity import Importer as FidelityImporter
+from ctbus_finance.importers.health_equity import Importer as HealthEquityImporter
+from ctbus_finance.importers.stock_action import BuyAction, SellAction
+from ctbus_finance.importers.vanguard import Importer as VanguardImporter
 from ctbus_finance.importers.venmo import Importer as VenmoImporter
 
 
@@ -411,7 +414,7 @@ checking_account_patterns = [
     ("Givedirectly", "Expenses:Charity:GiveDirectly"),
     ("UNIVERSITY OF PE", "Income:Expenses:UPenn"),
     ("O'BRIEN'S GENERA", "Expenses:Shopping:Groceries:OBriens-General-Store"),
-    ("COINBASE", "Assets:Investments:Crypto:Coinbase:USDC"),
+    ("COINBASE", "Expenses:Investments:Crypto:Coinbase"),
     ("JIFFY MART", "Expenses:Travel:Fuel:Jiffy-Mart"),
     ("Check", "Expenses:Rent"),
     ("BROADWAY GAS", "Expenses:Travel:Fuel:Broadway-Gas"),
@@ -497,4 +500,16 @@ CONFIG = [
             "931427108": 'WBA',
         },
     ),
+    VanguardImporter(
+        "Assets:Investments:Vanguard",
+        currency="USD",
+        account_nos={
+            "45886834": "Assets:Investments:Vanguard:Roth-IRA",
+            "74065422": "Assets:Investments:Vanguard:Brokerage",
+        },
+    ),
+    #HealthEquityImporter(
+    #    "Assets:Investments:HealthEquity:HSA",
+    #    currency="USD",
+    #)
 ]

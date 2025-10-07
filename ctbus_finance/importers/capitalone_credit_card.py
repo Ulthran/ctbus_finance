@@ -35,21 +35,27 @@ class Importer(importer.ImporterProtocol):
     def file_date(self, file):
         return max(map(lambda x: x.date, self.extract(file)))
 
-    def file_account(self, _):
+    def file_account(self, file: str) -> str:
         return self._account
 
-    def identify(self, file):
-        with open(file.name, encoding="utf-8") as csv_file:
-            for row in csv.DictReader(csv_file):
-                return row["Card No."] == self._last_four_account_digits
+    def identify(self, file: str) -> bool:
+        try:
+            with open(file, encoding="utf-8") as csv_file:
+                for row in csv.DictReader(csv_file):
+                    return row[_COLUMN_CARD_NO] == self._last_four_account_digits
+        except Exception as e:
+            pass
+        return False
 
-    def extract(self, f):
-        print("; Extracting from: ", f.name)
+    def sort(self, entries: data.Directives, reverse: bool = False) -> None:
+        pass
+
+    def extract(self, file: str, existing_entries: list[data.Directive] = []) -> list[data.Directive]:
         transactions = []
 
-        with open(f.name, encoding="utf-8") as csv_file:
+        with open(file, encoding="utf-8") as csv_file:
             for index, row in enumerate(csv.DictReader(csv_file)):
-                metadata = data.new_metadata(f.name, index)
+                metadata = data.new_metadata(file, index)
                 transaction = self._extract_transaction_from_row(row, metadata)
                 if not transaction:
                     continue

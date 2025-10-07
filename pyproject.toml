@@ -6,7 +6,7 @@ dependencies = [
     "beancount~=3.2",
     "beangulp~=0.2",
     "fava~=1.26",
-    "titlecase~=2.4",
+    "titlecase",
 ]
 requires-python = ">=3.9"
 

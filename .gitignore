@@ -4,6 +4,10 @@ alembic/
 data/
 db.sqlite
 reports/
+beancount/
+*.beancount
+csv/
+ctbus_finance/sensitive.py
 
 # Byte-compiled / optimized / DLL files
 __pycache__/
