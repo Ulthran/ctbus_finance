@@ -2,6 +2,7 @@ from beancount.core.position import Position
 from decimal import Decimal
 from collections import deque
 
+
 def reduce_fifo(positions: list[Position]) -> list[Position]:
     """
     Reduce a list of beancount.core.position.Position objects using FIFO logic.
@@ -35,8 +36,7 @@ def reduce_fifo(positions: list[Position]) -> list[Position]:
                     # Partial consumption of buy lot
                     remaining_qty = buy_qty - sell_qty
                     fifo[0] = Position(
-                        buy.units._replace(number=remaining_qty),
-                        buy.cost
+                        buy.units._replace(number=remaining_qty), buy.cost
                     )
                     sell_qty = Decimal("0")
 

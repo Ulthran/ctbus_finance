@@ -5,7 +5,18 @@ from decimal import Decimal
 
 
 class StockAction(ABC):
-    def __init__(self, date: datetime, account: str, symbol: str, quantity: Decimal, currency: str, price: Decimal, fees: Decimal, amount: Decimal, transaction_type: str) -> None:
+    def __init__(
+        self,
+        date: datetime,
+        account: str,
+        symbol: str,
+        quantity: Decimal,
+        currency: str,
+        price: Decimal,
+        fees: Decimal,
+        amount: Decimal,
+        transaction_type: str,
+    ) -> None:
         self.date = date.date()
         self.account = account
         self.symbol = symbol
@@ -33,8 +44,10 @@ class BuyAction(StockAction):
                     cost=position.CostSpec(
                         number_per=None,
                         number_total=None,
-                        currency=None, date=None,
-                        label=None, merge=False,
+                        currency=None,
+                        date=None,
+                        label=None,
+                        merge=False,
                     ),
                     price=None,
                     flag=None,
@@ -53,7 +66,12 @@ class BuyAction(StockAction):
             data.Posting(
                 account=self.account + ":" + self.symbol,
                 units=amount.Amount(self.quantity, self.symbol),
-                cost=position.Cost((self.amount / self.quantity).quantize(Decimal("0.000001")), self.currency, self.date, None),
+                cost=position.Cost(
+                    (self.amount / self.quantity).quantize(Decimal("0.000001")),
+                    self.currency,
+                    self.date,
+                    None,
+                ),
                 price=None,
                 flag=None,
                 meta=None,
@@ -67,7 +85,7 @@ class BuyAction(StockAction):
                 meta=None,
             ),
         ]
-    
+
 
 class SellAction(StockAction):
     def get_postings(self) -> list[data.Posting]:
@@ -134,7 +152,7 @@ class SellAction(StockAction):
                     meta=None,
                 ),
             )
-        
+
         return postings + [
             data.Posting(
                 account="Income:CapitalGains:Cash",
@@ -145,7 +163,7 @@ class SellAction(StockAction):
                 meta=None,
             ),
         ]
-    
+
 
 class DividendAction(StockAction):
     def get_postings(self) -> list[data.Posting]:
@@ -299,7 +317,7 @@ class DistributionAction(StockAction):
                     meta=None,
                 ),
             ]
-        
+
         return [
             data.Posting(
                 account=self.account + ":Cash",
@@ -340,7 +358,7 @@ class FeeAction(StockAction):
                 meta=None,
             ),
         ]
-    
+
 
 class ForeignTaxAction(StockAction):
     def get_postings(self) -> list[data.Posting]:

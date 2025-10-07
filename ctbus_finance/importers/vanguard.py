@@ -5,7 +5,18 @@ from typing import Type
 import titlecase
 from beancount.core import amount, data, flags, number as beancount_number, position
 from beangulp import importer
-from ctbus_finance.importers.stock_action import BuyAction, CheckReceivedAction, DividendAction, DistributionAction, FeeAction, ForeignTaxAction, MergerAction, SellAction, StockAction, TransferAction
+from ctbus_finance.importers.stock_action import (
+    BuyAction,
+    CheckReceivedAction,
+    DividendAction,
+    DistributionAction,
+    FeeAction,
+    ForeignTaxAction,
+    MergerAction,
+    SellAction,
+    StockAction,
+    TransferAction,
+)
 
 
 _COLUMN_DATE = "Trade Date"
@@ -43,7 +54,6 @@ class Importer(importer.ImporterProtocol):
                     (re.compile(pattern, flags=re.IGNORECASE), account_name)
                 )
 
-
     # ----------------------------
     # Quantizers
     # ----------------------------
@@ -68,7 +78,7 @@ class Importer(importer.ImporterProtocol):
 
     def file_account(self, file: str) -> str:
         return self._account
-    
+
     def _header_lines(self, file: str) -> int:
         with open(file, encoding="utf-8") as csv_file:
             # Skip first header
@@ -77,16 +87,14 @@ class Importer(importer.ImporterProtocol):
             while not next(csv_file).startswith("Account Number,"):
                 line_count += 1
             return line_count
-    
+
     def identify(self, file: str) -> bool:
         try:
             with open(file, encoding="utf-8") as csv_file:
                 for _ in range(self._header_lines(file)):
                     next(csv_file)
                 for row in csv.DictReader(csv_file):
-                    return (
-                        str(row[_COLUMN_ACCOUNT_NO]) in self._account_nos
-                    )
+                    return str(row[_COLUMN_ACCOUNT_NO]) in self._account_nos
         except Exception as e:
             pass
         return False
@@ -94,7 +102,9 @@ class Importer(importer.ImporterProtocol):
     def sort(self, entries: data.Directives, reverse: bool = False) -> None:
         pass
 
-    def extract(self, file: str, existing_entries: list[data.Directive] = []) -> list[data.Directive]:
+    def extract(
+        self, file: str, existing_entries: list[data.Directive] = []
+    ) -> list[data.Directive]:
         transactions = []
 
         with open(file, encoding="utf-8") as csv_file:
@@ -148,13 +158,27 @@ class Importer(importer.ImporterProtocol):
             date=transaction_date,
             account=account,
             symbol=symbol,
-            quantity=self._quantize_qty(
-                beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
-            ) if row[_COLUMN_QUANTITY] else beancount_number.D("0.000000"),
+            quantity=(
+                self._quantize_qty(
+                    beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
+                )
+                if row[_COLUMN_QUANTITY]
+                else beancount_number.D("0.000000")
+            ),
             currency=self._currency,
-            price=self._quantize_cash(beancount_number.D(row[_COLUMN_PRICE].replace(",", ""))),
-            fees=self._quantize_cash(beancount_number.D(row[_COLUMN_FEES].replace(",", ""))) if row[_COLUMN_FEES] else beancount_number.D("0.00"),
-            amount=self._quantize_cost(beancount_number.D(row[_COLUMN_AMOUNT].replace(",", ""))),
+            price=self._quantize_cash(
+                beancount_number.D(row[_COLUMN_PRICE].replace(",", ""))
+            ),
+            fees=(
+                self._quantize_cash(
+                    beancount_number.D(row[_COLUMN_FEES].replace(",", ""))
+                )
+                if row[_COLUMN_FEES]
+                else beancount_number.D("0.00")
+            ),
+            amount=self._quantize_cost(
+                beancount_number.D(row[_COLUMN_AMOUNT].replace(",", ""))
+            ),
             transaction_type=row[_COLUMN_TYPE].strip().upper(),
         )
         postings = action.get_postings()
@@ -169,4 +193,3 @@ class Importer(importer.ImporterProtocol):
             links=data.EMPTY_SET,
             postings=postings,
         )
-    

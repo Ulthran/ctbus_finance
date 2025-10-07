@@ -32,7 +32,7 @@ if __name__ == "__main__":
     txns: data.Directives = starting_balances()
     for csv, beancount in zip(csvs, beancounts):
         try:
-            
+
             importer = identify(CONFIG, str(csv))
 
             if not importer:
@@ -54,22 +54,20 @@ if __name__ == "__main__":
             f.write("\n")  # add a blank line between entries
 
     # Generate account file
-    with open(
-        "/home/ctbus/ctbus_finance/beancount/accounts.beancount", "w"
-    ) as f:
+    with open("/home/ctbus/ctbus_finance/beancount/accounts.beancount", "w") as f:
         f.write(accounts_str([transactions_fp, manual_fp]))
 
     # Generate commodities file
     commodities = get_commodities([transactions_fp, manual_fp])
-    with open(
-        "/home/ctbus/ctbus_finance/beancount/commodities.beancount", "w"
-    ) as f:
+    with open("/home/ctbus/ctbus_finance/beancount/commodities.beancount", "w") as f:
         for commodity in commodities:
             f.write(printer.format_entry(commodity))
 
     if True:
-    # Generate prices file
-        prices_fp = Path(f"/home/ctbus/ctbus_finance/beancount/prices/{datetime.now().strftime('%Y_%m_%d')}.beancount")
+        # Generate prices file
+        prices_fp = Path(
+            f"/home/ctbus/ctbus_finance/beancount/prices/{datetime.now().strftime('%Y_%m_%d')}.beancount"
+        )
         prices_fp.unlink(missing_ok=True)
 
         result = sp.run(

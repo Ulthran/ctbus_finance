@@ -4,7 +4,18 @@ import re
 import titlecase
 from beancount.core import amount, data, flags, number as beancount_number, position
 from beangulp import importer
-from ctbus_finance.importers.stock_action import BuyAction, CheckReceivedAction, DividendAction, DistributionAction, FeeAction, ForeignTaxAction, MergerAction, SellAction, StockAction, TransferAction
+from ctbus_finance.importers.stock_action import (
+    BuyAction,
+    CheckReceivedAction,
+    DividendAction,
+    DistributionAction,
+    FeeAction,
+    ForeignTaxAction,
+    MergerAction,
+    SellAction,
+    StockAction,
+    TransferAction,
+)
 
 
 _COLUMN_DATE = "Run Date"
@@ -47,7 +58,6 @@ class Importer(importer.ImporterProtocol):
                 )
         self._cusip_map = cusip_map
 
-
     # ----------------------------
     # Quantizers
     # ----------------------------
@@ -72,7 +82,7 @@ class Importer(importer.ImporterProtocol):
 
     def file_account(self, file: str) -> str:
         return self._account
-    
+
     def identify(self, file: str) -> bool:
         try:
             with open(file, encoding="utf-8") as csv_file:
@@ -81,7 +91,8 @@ class Importer(importer.ImporterProtocol):
                 next(csv_file)
                 for row in csv.DictReader(csv_file):
                     return (
-                        str(row[_COLUMN_ACCOUNT_NO]).strip('"') in self._account_nos.keys()
+                        str(row[_COLUMN_ACCOUNT_NO]).strip('"')
+                        in self._account_nos.keys()
                     )
         except Exception as e:
             pass
@@ -90,7 +101,9 @@ class Importer(importer.ImporterProtocol):
     def sort(self, entries: data.Directives, reverse: bool = False) -> None:
         pass
 
-    def extract(self, file: str, existing_entries: list[data.Directive] = []) -> list[data.Directive]:
+    def extract(
+        self, file: str, existing_entries: list[data.Directive] = []
+    ) -> list[data.Directive]:
         transactions = []
 
         with open(file, encoding="utf-8") as csv_file:
@@ -112,7 +125,7 @@ class Importer(importer.ImporterProtocol):
         # Stop if this is a disclaimer row (no date, no account, etc.)
         if not row[_COLUMN_DATE] or not row[_COLUMN_ACCOUNT_NO]:
             return None
-        
+
         transaction_date = datetime.datetime.strptime(row[_COLUMN_DATE], "%m/%d/%Y")
         action = row[_COLUMN_ACTION].strip().upper()
         narration = titlecase.titlecase(row[_COLUMN_DESCRIPTION] or row[_COLUMN_ACTION])
@@ -151,7 +164,7 @@ class Importer(importer.ImporterProtocol):
         elif "TRANSFERRED FROM" in action:
             action_type = TransferAction
         elif "TRANSFERRED TO" in action:
-            return None # Handled by other side of transfer
+            return None  # Handled by other side of transfer
         elif "MERGER" in action:
             action_type = MergerAction
             symbol = clean_symbol
@@ -188,13 +201,27 @@ class Importer(importer.ImporterProtocol):
             date=transaction_date,
             account=account,
             symbol=symbol,
-            quantity=self._quantize_qty(
-                beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
-            ) if row[_COLUMN_QUANTITY] else beancount_number.D("0.000000"),
+            quantity=(
+                self._quantize_qty(
+                    beancount_number.D(row[_COLUMN_QUANTITY].replace(",", ""))
+                )
+                if row[_COLUMN_QUANTITY]
+                else beancount_number.D("0.000000")
+            ),
             currency=self._currency,
-            price=self._quantize_cash(beancount_number.D(row[_COLUMN_PRICE].replace(",", ""))),
-            fees=self._quantize_cash(beancount_number.D(row[_COLUMN_FEES].replace(",", ""))) if row[_COLUMN_FEES] else beancount_number.D("0.00"),
-            amount=self._quantize_cost(beancount_number.D(row[_COLUMN_AMOUNT].replace(",", ""))),
+            price=self._quantize_cash(
+                beancount_number.D(row[_COLUMN_PRICE].replace(",", ""))
+            ),
+            fees=(
+                self._quantize_cash(
+                    beancount_number.D(row[_COLUMN_FEES].replace(",", ""))
+                )
+                if row[_COLUMN_FEES]
+                else beancount_number.D("0.00")
+            ),
+            amount=self._quantize_cost(
+                beancount_number.D(row[_COLUMN_AMOUNT].replace(",", ""))
+            ),
             transaction_type=row[_COLUMN_TYPE].strip().upper(),
         )
         postings = action.get_postings()
@@ -209,8 +236,10 @@ class Importer(importer.ImporterProtocol):
             links=data.EMPTY_SET,
             postings=postings,
         )
-    
-    def _consolidate_merger_transactions(self, transactions: list[data.Transaction]) -> list[data.Directive]:
+
+    def _consolidate_merger_transactions(
+        self, transactions: list[data.Transaction]
+    ) -> list[data.Directive]:
         consolidated = []
         skip_next = False
 

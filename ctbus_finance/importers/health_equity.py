@@ -19,7 +19,7 @@ class Importer(importer.ImporterProtocol):
     def __init__(self, account, currency="USD"):
         self._account = account
         self._currency = currency
-    
+
     def identify(self, file: str) -> bool:
         try:
             with open(file, encoding="utf-8") as csv_file:
@@ -29,14 +29,16 @@ class Importer(importer.ImporterProtocol):
         except Exception as e:
             pass
         return False
-    
+
     def sort(self, entries: data.Directives, reverse: bool = False) -> None:
         pass
 
-    def extract(self, file: str, existing_entries: list[data.Directive] = []) -> list[data.Directive]:
+    def extract(
+        self, file: str, existing_entries: list[data.Directive] = []
+    ) -> list[data.Directive]:
         transactions = []
         with open(file, encoding="utf-8") as csv_file:
-            next(csv_file) # Skip first line
+            next(csv_file)  # Skip first line
             reader = csv.DictReader(csv_file)
             for index, row in enumerate(reader):
                 metadata = data.new_metadata(file, index)
@@ -52,7 +54,16 @@ class Importer(importer.ImporterProtocol):
 
         transaction_date = datetime.strptime(row[_COLUMN_DATE], "%m/%d/%Y").date()
         description = str(row[_COLUMN_DESCRIPTION]).strip()
-        transaction_amount = abs(float(str(row[_COLUMN_AMOUNT]).replace("$", "").replace(",", "").replace("(", "").replace(")", "").strip()))
+        transaction_amount = abs(
+            float(
+                str(row[_COLUMN_AMOUNT])
+                .replace("$", "")
+                .replace(",", "")
+                .replace("(", "")
+                .replace(")", "")
+                .strip()
+            )
+        )
 
         if "INVESTMENT ADMIN FEE" in description.upper():
             account_from = self._account + ":Cash"
@@ -73,12 +84,14 @@ class Importer(importer.ImporterProtocol):
         else:
             print("UNHANDLED HealthEquity transaction:", description)
             return None
-        
 
         postings = [
             data.Posting(
                 account=account_from,
-                units=-amount.Amount(Decimal(transaction_amount).quantize(Decimal("0.01")), self._currency),
+                units=-amount.Amount(
+                    Decimal(transaction_amount).quantize(Decimal("0.01")),
+                    self._currency,
+                ),
                 cost=None,
                 price=None,
                 flag=None,
@@ -86,7 +99,10 @@ class Importer(importer.ImporterProtocol):
             ),
             data.Posting(
                 account=account_to,
-                units=amount.Amount(Decimal(transaction_amount).quantize(Decimal("0.01")), self._currency),
+                units=amount.Amount(
+                    Decimal(transaction_amount).quantize(Decimal("0.01")),
+                    self._currency,
+                ),
                 cost=None,
                 price=None,
                 flag=None,

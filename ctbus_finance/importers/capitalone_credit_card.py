@@ -50,7 +50,9 @@ class Importer(importer.ImporterProtocol):
     def sort(self, entries: data.Directives, reverse: bool = False) -> None:
         pass
 
-    def extract(self, file: str, existing_entries: list[data.Directive] = []) -> list[data.Directive]:
+    def extract(
+        self, file: str, existing_entries: list[data.Directive] = []
+    ) -> list[data.Directive]:
         transactions = []
 
         with open(file, encoding="utf-8") as csv_file:

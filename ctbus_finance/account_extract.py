@@ -33,13 +33,16 @@ def get_currency(acct: str) -> str:
         if s == "Cash":
             return "USD"
         return s
-    
+
     return "USD"
 
 
 def accounts_str(accts: list[Path]):
     return "\n".join(
-        [f"1990-01-01 open {account} {get_currency(account)}" for account in get_accounts(accts)]
+        [
+            f"1990-01-01 open {account} {get_currency(account)}"
+            for account in get_accounts(accts)
+        ]
     )
 
 
@@ -62,15 +65,15 @@ def get_commodities(accts: list[Path]) -> list[Commodity]:
     symbols = get_price_symbols(accts)
     commodities = []
     for symbol, real_symbol in symbols.items():
-        commodities.append(Commodity(
-            meta={"price": f"USD:yahoo/{real_symbol}"},
-            date=datetime.now().date(),
-            currency=symbol,
-        ))
+        commodities.append(
+            Commodity(
+                meta={"price": f"USD:yahoo/{real_symbol}"},
+                date=datetime.now().date(),
+                currency=symbol,
+            )
+        )
 
     return commodities
-
-
 
 
 if __name__ == "__main__":

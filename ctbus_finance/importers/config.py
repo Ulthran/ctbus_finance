@@ -494,10 +494,10 @@ CONFIG = [
             "Y81595674": "Assets:Investments:Fidelity:Large-Cap",
         },
         cusip_map={
-            "03662Q105": 'ANSS',
-            "254709108": 'DFS',
-            "42809H107": 'HES',
-            "931427108": 'WBA',
+            "03662Q105": "ANSS",
+            "254709108": "DFS",
+            "42809H107": "HES",
+            "931427108": "WBA",
         },
     ),
     VanguardImporter(
@@ -508,8 +508,8 @@ CONFIG = [
             "74065422": "Assets:Investments:Vanguard:Brokerage",
         },
     ),
-    #HealthEquityImporter(
+    # HealthEquityImporter(
     #    "Assets:Investments:HealthEquity:HSA",
     #    currency="USD",
-    #)
+    # )
 ]
