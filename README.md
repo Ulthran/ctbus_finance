@@ -2,21 +2,28 @@
 
 Tools for importing real-world financial statements into [Beancount](https://beancount.github.io/) and exploring them with [Fava](https://beancount.github.io/fava/).
 
-## Capital One credit card importer
+I'll be the first to admit, everything here is messy. It's intended for personal use but if anyone comes away with useful ideas from it that's great!
 
-`bean-extract ctbus_finance/importers/config.py csv/CapitalOneQuicksilver.csv > beancount/capitalone_quicksilver.beancount`
+## Setup
 
-`python ctbus_finance/expense_accounts.py beancount/* > beancount/expense_accounts.beancount`
+- Make `csv/` and `beancount/` dirs
+- Download CSVs to `csv/`
+- Make `ctbus_finance/sensitive.py` with appropriate values
+- Make env `python -m venv env/` and activate `source env/bin/activate`
+- Install `pip install -e .`
+
+## Importing data
+
+`python ctbus_finance/import.py`
+
+Steps:
+
+- Collect CSVs
+- Import CSVs as Transacations
+- Reconcile Transactions
+- Collect commodities for pricing
+- Collect price data
 
 ## Launching the Fava web UI
 
-You can also launch the Fava web interface directly from Python using the provided helper:
-
-```python
-from ctbus_finance import launch_fava
-
-# This will block while Fava is running.
-launch_fava("~/Documents/finance.beancount", host="0.0.0.0", port=5000)
-```
-
-Pass ``open_browser=False`` to skip opening a browser window automatically, or supply additional CLI flags via ``extra_args``.
+`python ctbus_finance/gui.py`

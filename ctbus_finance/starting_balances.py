@@ -1,6 +1,6 @@
 from datetime import date, datetime
 from beancount.core import amount, data, flags, position
-from ctbus_finance.sensitive import starting_investments
+from ctbus_finance._sensitive import starting_investments
 from decimal import Decimal
 
 
